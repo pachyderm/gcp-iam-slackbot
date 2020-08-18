@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -96,25 +97,29 @@ func verifyAuth(w http.ResponseWriter, r *http.Request) error {
 	log.Debug("Verifying Auth")
 
 	// Read request body
-	defer r.Body.Close()
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return fmt.Errorf("[ERROR] Fail to read request body: %v", err)
-	}
+	//defer r.Body.Close()
+	//body, err := ioutil.ReadAll(r.Body)
+	//if err != nil {
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return fmt.Errorf("[ERROR] Fail to read request body: %v", err)
+	//}
 	// Reset request body for other methods to act on
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	//r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
 	// Verify signing secret
-	sv, err := slack.NewSecretsVerifier(r.Header, signingSecret)
+	verifier, err := slack.NewSecretsVerifier(r.Header, signingSecret)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		return fmt.Errorf("[ERROR] Fail to verify SigningSecret: %v", err)
+		return fmt.Errorf("Failed to verify SigningSecret: %v", err)
 	}
-	sv.Write(body)
-	if err := sv.Ensure(); err != nil {
+	r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &verifier))
+	//if _, err := sv.Write(body); err != nil {
+	//	w.WriteHeader(http.StatusUnauthorized)
+	//	return fmt.Errorf("[ERROR] Fail to verify SigningSecret: %v", err)
+	//}
+	if err := verifier.Ensure(); err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		return fmt.Errorf("[ERROR] Fail to verify SigningSecret: %v", err)
+		return fmt.Errorf("Failed to verify SigningSecret: %v", err)
 	}
 	return nil
 }
@@ -148,7 +153,7 @@ func approval(message slack.InteractionCallback) error {
 		}
 	}
 
-	headerText := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf(approvalText), false, false)
+	headerText := slack.NewTextBlockObject("mrkdwn", fmt.Sprint(approvalText), false, false)
 	headerSection = slack.NewSectionBlock(headerText, nil, nil)
 	//text = fmt.Sprintf("User: %s\n When: %s\n Reason: %s\n  Approver: %s\n The role %s has been granted for 1 hour.", user, when, reason, payload.User.Name, role)
 	nameField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*User:*\n%s", user), false, false)
