@@ -132,12 +132,24 @@ func approval(message slack.InteractionCallback) error {
 
 	//actionType := actionInfo[0]
 	approval := actionInfo[1]
-	user := actionInfo[2]
+	requestor := actionInfo[2]
 	role := actionInfo[3]
 	when := actionInfo[4]
 	reason := actionInfo[5]
 
-	log.Debugf("User: %s \n", user)
+	profile, err := api.GetUserProfile(message.User.ID, true)
+	if err != nil {
+		return fmt.Errorf("Unable to get user info from slack API: %v \n", err)
+
+	}
+	approver := strings.Replace(profile.Email, "@pachyderm.com", "@pachyderm.io", 1)
+	if !strings.HasSuffix(approver, "@pachyderm.io") {
+		return fmt.Errorf("Unauthorized User, not from pachyderm.io: %v \n", approver)
+	}
+	// TODO: Remove hardcoded exception for sean for testing
+	if requestor == approver && requestor != "sean@pachyderm.io" {
+		return fmt.Errorf("Unauthorized, approver cannot be requester: %v \n", approver)
+	}
 
 	var headerSection *slack.SectionBlock
 	var fieldsSection *slack.SectionBlock
@@ -155,26 +167,14 @@ func approval(message slack.InteractionCallback) error {
 		}
 	}
 
-	log.Debugf("APPROVER_ID: %s", message.User.ID)
-	profile, err := api.GetUserProfile(message.User.ID, true)
-	if err != nil {
-		return fmt.Errorf("Unable to get user info from slack API: %v \n", err)
-
-	}
-	log.Debugf("APPROVER_EMAIL: %s", profile.Email)
-	email := strings.Replace(profile.Email, "@pachyderm.com", "@pachyderm.io", 1)
-	if !strings.HasSuffix(email, "@pachyderm.io") {
-		return fmt.Errorf("Unauthorized User, not from pachyderm.io: %v \n", email)
-	}
-
 	headerText := slack.NewTextBlockObject("mrkdwn", fmt.Sprint(approvalText), false, false)
 	headerSection = slack.NewSectionBlock(headerText, nil, nil)
 	//text = fmt.Sprintf("User: %s\n When: %s\n Reason: %s\n  Approver: %s\n The role %s has been granted for 1 hour.", user, when, reason, payload.User.Name, role)
-	nameField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*User:*\n%s", user), false, false)
+	nameField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*User:*\n%s", requestor), false, false)
 	typeField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Role:*\n%s", role), false, false)
 	whenField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*When:*\n%s", when), false, false)
 	reasonField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Reason:*\n%s", reason), false, false)
-	approverField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s:*\n%s", approverText, email), false, false)
+	approverField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s:*\n%s", approverText, approver), false, false)
 
 	fieldSlice := make([]*slack.TextBlockObject, 0)
 	fieldSlice = append(fieldSlice, nameField)
@@ -284,11 +284,6 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 // Please take a look at the comment in the critical section before making changes
 func conditionalBindIAMPolicy(ctx context.Context, orgId, username, IAMRole string) error {
 	log.Debug("Getting IAM Policy")
-	//c, err := google.DefaultClient(ctx, cloudresourcemanager.CloudPlatformScope)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//cloudResourceManagerService, err := cloudresourcemanager.New(c)
 
 	cloudResourceManagerService, err := cloudresourcemanager.NewService(ctx)
 	if err != nil {
