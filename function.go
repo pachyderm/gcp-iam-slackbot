@@ -15,16 +15,17 @@ import (
 
 	"github.com/jpillora/backoff"
 	"github.com/slack-go/slack"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/googleapi"
 )
 
 var signingSecret string
+var api *slack.Client
 
 func init() {
 	signingSecret = os.Getenv("SLACK_SECRET")
 	log.SetLevel(log.DebugLevel)
+	api = slack.New(os.Getenv("SLACK_API_TOKEN"))
 }
 
 func SlashHandler(w http.ResponseWriter, r *http.Request) {
@@ -154,6 +155,18 @@ func approval(message slack.InteractionCallback) error {
 		}
 	}
 
+	log.Debugf("APPROVER_ID: %s", message.User.ID)
+	profile, err := api.GetUserProfile(message.User.ID, true)
+	if err != nil {
+		return fmt.Errorf("Unable to get user info from slack API: %v \n", err)
+
+	}
+	log.Debugf("APPROVER_EMAIL: %s", profile.Email)
+	email := strings.Replace(profile.Email, "@pachyderm.com", "@pachyderm.io", 1)
+	if !strings.HasSuffix(email, "@pachyderm.io") {
+		return fmt.Errorf("Unauthorized User, not from pachyderm.io: %v \n", email)
+	}
+
 	headerText := slack.NewTextBlockObject("mrkdwn", fmt.Sprint(approvalText), false, false)
 	headerSection = slack.NewSectionBlock(headerText, nil, nil)
 	//text = fmt.Sprintf("User: %s\n When: %s\n Reason: %s\n  Approver: %s\n The role %s has been granted for 1 hour.", user, when, reason, payload.User.Name, role)
@@ -161,7 +174,7 @@ func approval(message slack.InteractionCallback) error {
 	typeField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Role:*\n%s", role), false, false)
 	whenField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*When:*\n%s", when), false, false)
 	reasonField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Reason:*\n%s", reason), false, false)
-	approverField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s:*\n%s", approverText, message.User.Name), false, false)
+	approverField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s:*\n%s", approverText, email), false, false)
 
 	fieldSlice := make([]*slack.TextBlockObject, 0)
 	fieldSlice = append(fieldSlice, nameField)
@@ -195,13 +208,28 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 	log.Debug("SlashCommand Escalate")
 
 	// Header Section
-	headerText := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("There is a new authentication request to escalate GCP privileges"), false, false)
+	headerText := slack.NewTextBlockObject("mrkdwn", "There is a new authentication request to escalate GCP privileges", false, false)
 	headerSection := slack.NewSectionBlock(headerText, nil, nil)
 
-	user := s.UserName
+	log.Debugf("USER_ID: %s", s.UserID)
+	profile, err := api.GetUserProfile(s.UserID, true)
+	if err != nil {
+		log.Errorf("Unable to get user info from slack API: %v \n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	log.Debugf("USER_EMAIL: %s", profile.Email)
+
+	user := strings.Replace(profile.Email, "@pachyderm.com", "@pachyderm.io", 1)
 	role := "Hub On Call Elevated"
 	when := time.Now().Format("Mon Jan 2 15:04:05 MST 2006")
 	reason := s.Text
+
+	if !strings.HasSuffix(user, "@pachyderm.io") {
+		log.Errorf("Unauthorized User, not from pachyderm.io: %v \n", user)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	// Fields
 	nameField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*User:*\n%s", user), false, false)
@@ -240,7 +268,12 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(b)
+	_, err = w.Write(b)
+	if err != nil {
+		log.Errorf("Unable to send escalation request to slack: %v \n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 }
 
@@ -251,13 +284,13 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 // Please take a look at the comment in the critical section before making changes
 func conditionalBindIAMPolicy(ctx context.Context, orgId, username, IAMRole string) error {
 	log.Debug("Getting IAM Policy")
-	c, err := google.DefaultClient(ctx, cloudresourcemanager.CloudPlatformScope)
-	if err != nil {
-		log.Fatal(err)
-	}
-	cloudResourceManagerService, err := cloudresourcemanager.New(c)
+	//c, err := google.DefaultClient(ctx, cloudresourcemanager.CloudPlatformScope)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//cloudResourceManagerService, err := cloudresourcemanager.New(c)
 
-	//cloudResourceManagerService, err := cloudresourcemanager.NewService(ctx)
+	cloudResourceManagerService, err := cloudresourcemanager.NewService(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize google cloudresourcemanager: %v", err)
 	}
