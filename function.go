@@ -163,7 +163,7 @@ func approval(message slack.InteractionCallback) error {
 
 		err := conditionalBindIAMPolicy(ctx, "organizations/6487630834", "sean@pachyderm.io", "roles/editor")
 		if err != nil {
-			return fmt.Errorf("[ERROR] Error retrieving IAM: %v", err)
+			return fmt.Errorf("Unable to set IAM policy: %v", err)
 		}
 	}
 
@@ -290,11 +290,19 @@ func conditionalBindIAMPolicy(ctx context.Context, orgId, username, IAMRole stri
 		return fmt.Errorf("failed to initialize google cloudresourcemanager: %v", err)
 	}
 
-	//userEmail := []string{fmt.Sprintf("user:%s", username)}
-	//binding := &cloudresourcemanager.Binding{
-	//	Role:    IAMRole,
-	//	Members: userEmail,
-	//}
+	userEmail := []string{fmt.Sprintf("user:%s", username)}
+	start := time.Now()
+	hourFromNow := start.Add(time.Hour).Format(time.RFC3339)
+	log.Debugf("Timestamp: %s", hourFromNow)
+	binding := &cloudresourcemanager.Binding{
+		Role:    IAMRole,
+		Members: userEmail,
+		Condition: &cloudresourcemanager.Expr{
+			Title:       "HUB-GCP-IAM-TEST-SLACK",
+			Description: "THIS IS A TEST",
+			Expression:  fmt.Sprintf("request.time < timestamp(%s)", hourFromNow),
+		},
+	}
 	getIamPolicyRequest := &cloudresourcemanager.GetIamPolicyRequest{}
 	//folderService := cloudresourcemanager.NewFoldersService(cloudResourceManagerService)
 	b := &backoff.Backoff{
@@ -316,7 +324,7 @@ func conditionalBindIAMPolicy(ctx context.Context, orgId, username, IAMRole stri
 		if err != nil {
 			return fmt.Errorf("failed to retrieve iam policy: %v", err)
 		}
-		//fmt.Printf("Policy is: %s\n", existingPolicy)
+		log.Debugf("Existing Policy is: %v\n", existingPolicy)
 
 		// Please use caution for this section!!
 		// It is important that the existing policy is appeneded to.
@@ -325,20 +333,20 @@ func conditionalBindIAMPolicy(ctx context.Context, orgId, username, IAMRole stri
 		if existingPolicy == nil {
 			return fmt.Errorf("Error: No existing policy was found for the GCP Organization")
 		}
-		//existingPolicy.Bindings = append(existingPolicy.Bindings, binding)
-		//setIamPolicyRequest := &cloudresourcemanager.SetIamPolicyRequest{
-		//	Policy: existingPolicy,
-		//}
-		//_, err = projectService.SetIamPolicy(projectId, setIamPolicyRequest).Context(ctx).Do()
-		//if e, ok := err.(*googleapi.Error); ok {
-		//	if e.Code == 409 {
-		//		time.Sleep(d)
-		//		continue
-		//	}
-		//}
-		//if err != nil {
-		//	return fmt.Errorf("failed to set iam policy: %v", err)
-		//}
+		existingPolicy.Bindings = append(existingPolicy.Bindings, binding)
+		setIamPolicyRequest := &cloudresourcemanager.SetIamPolicyRequest{
+			Policy: existingPolicy,
+		}
+		_, err = cloudResourceManagerService.Organizations.SetIamPolicy(orgId, setIamPolicyRequest).Context(ctx).Do()
+		if e, ok := err.(*googleapi.Error); ok {
+			if e.Code == 409 {
+				time.Sleep(d)
+				continue
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("failed to set iam policy: %v", err)
+		}
 		return nil
 	}
 }
