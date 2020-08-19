@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -52,7 +51,11 @@ func SlashHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(b)
+		_, err = w.Write(b)
+		if err != nil {
+			log.Error("Unable to send echo response to slack")
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	case "/escalate":
 		gcpEscalateIAM(w, s)
 	default:
@@ -97,26 +100,24 @@ func verifyAuth(w http.ResponseWriter, r *http.Request) error {
 	log.Debug("Verifying Auth")
 
 	// Read request body
-	//defer r.Body.Close()
-	//body, err := ioutil.ReadAll(r.Body)
-	//if err != nil {
-	//	w.WriteHeader(http.StatusInternalServerError)
-	//	return fmt.Errorf("[ERROR] Fail to read request body: %v", err)
-	//}
+	defer r.Body.Close()
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return fmt.Errorf("[ERROR] Fail to read request body: %v", err)
+	}
 	// Reset request body for other methods to act on
-	//r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 	// Verify signing secret
 	verifier, err := slack.NewSecretsVerifier(r.Header, signingSecret)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return fmt.Errorf("Failed to verify SigningSecret: %v", err)
 	}
-	r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &verifier))
-	//if _, err := sv.Write(body); err != nil {
-	//	w.WriteHeader(http.StatusUnauthorized)
-	//	return fmt.Errorf("[ERROR] Fail to verify SigningSecret: %v", err)
-	//}
+	if _, err := verifier.Write(body); err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return fmt.Errorf("[ERROR] Fail to verify SigningSecret: %v", err)
+	}
 	if err := verifier.Ensure(); err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return fmt.Errorf("Failed to verify SigningSecret: %v", err)
