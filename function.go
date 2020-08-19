@@ -161,7 +161,7 @@ func approval(message slack.InteractionCallback) error {
 		approvalText = "Approved. The role has been granted for 1 hour."
 		approverText = "Approver"
 
-		err := conditionalBindIAMPolicy(ctx, "organizations/6487630834", "sean@pachyderm.io", "roles/editor")
+		err := conditionalBindIAMPolicy(ctx, "organizations/6487630834", requestor, "organizations/6487630834/roles/hub_on_call_elevated")
 		if err != nil {
 			return fmt.Errorf("Unable to set IAM policy: %v", err)
 		}
@@ -295,15 +295,21 @@ func conditionalBindIAMPolicy(ctx context.Context, orgId, username, IAMRole stri
 	hourFromNow := start.Add(time.Hour).Format(time.RFC3339)
 	log.Debugf("Timestamp: %s", hourFromNow)
 	binding := &cloudresourcemanager.Binding{
+		// Conditions cannot be set on primitive roles
+		// Error 400: LintValidationUnits/BindingRoleAllowConditionCheck Error: Conditions can't be set on primitive roles
 		Role:    IAMRole,
 		Members: userEmail,
 		Condition: &cloudresourcemanager.Expr{
-			Title:       "HUB-GCP-IAM-TEST-SLACK",
-			Description: "THIS IS A TEST",
-			Expression:  fmt.Sprintf("request.time < timestamp(%s)", hourFromNow),
+			Title:       fmt.Sprintf("Until: %s", hourFromNow),
+			Description: "This temporarily grants Hub On Call Escalated privileges for 1 hour",
+			Expression:  fmt.Sprintf("request.time < timestamp(\"%s\")", hourFromNow),
 		},
 	}
-	getIamPolicyRequest := &cloudresourcemanager.GetIamPolicyRequest{}
+	getIamPolicyRequest := &cloudresourcemanager.GetIamPolicyRequest{
+		Options: &cloudresourcemanager.GetPolicyOptions{
+			RequestedPolicyVersion: 3,
+		},
+	}
 	//folderService := cloudresourcemanager.NewFoldersService(cloudResourceManagerService)
 	b := &backoff.Backoff{
 		Min:    2000 * time.Millisecond,
@@ -324,7 +330,6 @@ func conditionalBindIAMPolicy(ctx context.Context, orgId, username, IAMRole stri
 		if err != nil {
 			return fmt.Errorf("failed to retrieve iam policy: %v", err)
 		}
-		log.Debugf("Existing Policy is: %v\n", existingPolicy)
 
 		// Please use caution for this section!!
 		// It is important that the existing policy is appeneded to.
