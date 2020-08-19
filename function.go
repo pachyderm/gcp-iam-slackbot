@@ -334,6 +334,9 @@ func conditionalBindIAMPolicy(ctx context.Context, orgId, username, IAMRole stri
 			return fmt.Errorf("Error: No existing policy was found for the GCP Organization")
 		}
 		existingPolicy.Bindings = append(existingPolicy.Bindings, binding)
+		// In order to use conditional IAM, must set version to 3
+		// See https://cloud.google.com/iam/docs/policies#versions
+		existingPolicy.Version = 3
 		setIamPolicyRequest := &cloudresourcemanager.SetIamPolicyRequest{
 			Policy: existingPolicy,
 		}
