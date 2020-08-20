@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PagerDuty/go-pagerduty"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/jpillora/backoff"
@@ -19,13 +20,17 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
+const HubEscalationPolicyID = "PJVVTQR"
+
 var signingSecret string
+var client *pagerduty.Client
 var api *slack.Client
 
 func init() {
 	signingSecret = os.Getenv("SLACK_SECRET")
 	log.SetLevel(log.DebugLevel)
 	api = slack.New(os.Getenv("SLACK_API_TOKEN"))
+	client = pagerduty.NewClient(os.Getenv("PD_AUTH_TOKEN"))
 }
 
 func SlashHandler(w http.ResponseWriter, r *http.Request) {
@@ -140,14 +145,17 @@ func approval(message slack.InteractionCallback) error {
 	profile, err := api.GetUserProfile(message.User.ID, true)
 	if err != nil {
 		return fmt.Errorf("Unable to get user info from slack API: %v \n", err)
-
 	}
 	approver := strings.Replace(profile.Email, "@pachyderm.com", "@pachyderm.io", 1)
 	if !strings.HasSuffix(approver, "@pachyderm.io") {
 		return fmt.Errorf("Unauthorized User, not from pachyderm.io: %v \n", approver)
 	}
+	oncall, err := lookupCurrentOnCall()
+	if err != nil {
+		return fmt.Errorf("Unable to get user info from pagerduty API: %v \n", err)
+	}
 	// TODO: Remove hardcoded exception for sean for testing
-	if requestor == approver && requestor != "sean@pachyderm.io" {
+	if requestor == approver && requestor != "sean@pachyderm.io" && !oncall[requestor] {
 		return fmt.Errorf("Unauthorized, approver cannot be requester: %v \n", approver)
 	}
 
@@ -375,4 +383,23 @@ func conditionalBindIAMPolicy(ctx context.Context, orgId, username, IAMRole stri
 		}
 		return nil
 	}
+}
+
+func lookupCurrentOnCall() (map[string]bool, error) {
+	oc, err := client.ListOnCalls(pagerduty.ListOnCallOptions{})
+	if err != nil {
+		return nil, err
+	}
+	users := map[string]bool{}
+	for _, x := range oc.OnCalls {
+		// This is the hardcoded Hub EscalationPolicyID
+		if (x.EscalationLevel == 1 || x.EscalationLevel == 2) && x.EscalationPolicy.APIObject.ID == HubEscalationPolicyID {
+			user, err := client.GetUser(x.User.APIObject.ID, pagerduty.GetUserOptions{})
+			if err != nil {
+				return nil, err
+			}
+			users[user.Email] = true
+		}
+	}
+	return users, nil
 }
