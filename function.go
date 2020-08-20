@@ -230,6 +230,22 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	validUsersAndRoles := map[string]string{
+		"jonathan@pachyderm.io": "Hub On Call Elevated",
+		"alysha@pachyderm.io":   "Hub On Call Elevated",
+		"jdoliner@pachyderm.io": "Hub On Call Elevated",
+		"nitin@pachyderm.io":    "Hub On Call Elevated",
+		"cam@pachyderm.io":      "Hub On Call Elevated",
+		"jeff@pachyderm.io":     "Hub On Call Elevated",
+		"connor@pachyderm.io":   "Hub On Call Elevated",
+		"sean@pachyderm.io":     "Hub On Call Elevated",
+		"kyle@pachyderm.io":     "Hub On Call Elevated",
+	}
+	if _, ok := validUsersAndRoles[user]; !ok {
+		log.Errorf("Unauthorized User, not in the list of approved users: %v \n", user)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	// Fields
 	nameField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*User:*\n%s", user), false, false)
