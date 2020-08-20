@@ -176,6 +176,8 @@ func approval(message slack.InteractionCallback) error {
 	reasonField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Reason:*\n%s", reason), false, false)
 	approverField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s:*\n%s", approverText, approver), false, false)
 
+	log.Infof("[AUDIT] Requestor: %s, Role: %s, When: %s, Reason: %s, %s: %s", requestor, role, when, reason, approverText, approver)
+
 	fieldSlice := make([]*slack.TextBlockObject, 0)
 	fieldSlice = append(fieldSlice, nameField)
 	fieldSlice = append(fieldSlice, typeField)
