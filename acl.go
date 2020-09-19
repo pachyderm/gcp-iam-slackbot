@@ -3,7 +3,9 @@ package gcpiamslack
 import (
 	"context"
 	"fmt"
-	"log"
+
+	"git.sr.ht/~urandom/dwd"
+	log "github.com/sirupsen/logrus"
 
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/option"
@@ -53,17 +55,23 @@ type EscalationRequest struct {
 func (r *EscalationRequest) GetGroupMembership() error {
 	//TODO: Get group membership
 	ctx := context.Background()
+
+	ts := dwd.TokenSource(
+		ctx,
+		"jdoliner@pachyderm.io", // User must be a GSuite admin.
+		admin.AdminDirectoryGroupReadOnlyScope,
+	)
 	//
 	srv, err := admin.NewService(ctx, option.WithScopes("https://www.googleapis.com/auth/admin.directory.group.readonly"))
 	if err != nil {
 		log.Fatalf("Unable to retrieve directory Client %v", err)
 	}
 	grpSrv := admin.NewGroupsService(srv)
-	groups, err := grpSrv.List().UserKey("sean@pachyderm.io").Do()
+	groups, err := grpSrv.List().Domain("pachyderm.io").UserKey("sean@pachyderm.com").Do()
 	if err != nil {
 		fmt.Println(err)
 	}
-	log.Warnf("Groups: %s", groups)
+	log.Warn("Groups: %s", groups)
 	r.Groups["pd-current-oncall"] = struct{}{}
 	return nil
 }
