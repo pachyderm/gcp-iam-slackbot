@@ -25,6 +25,10 @@ func handleApproval(message slack.InteractionCallback) error {
 	if err != nil {
 		return fmt.Errorf("Unable to parse approval status: %v \n", err)
 	}
+	onCall, err := strconv.ParseBool(actionInfo[6])
+	if err != nil {
+		return fmt.Errorf("Unable to parse oncall status: %v \n", err)
+	}
 
 	r := &EscalationRequest{
 		Member:    member(actionInfo[2]),
@@ -33,6 +37,7 @@ func handleApproval(message slack.InteractionCallback) error {
 		Reason:    actionInfo[5],
 		Timestamp: actionInfo[4],
 		Status:    approval(approvalStatus),
+		Oncall:    onCall,
 	}
 
 	profile, err := api.GetUserProfile(message.User.ID, true)
@@ -43,24 +48,18 @@ func handleApproval(message slack.InteractionCallback) error {
 	if !strings.HasSuffix(r.Approver, "@pachyderm.io") {
 		return fmt.Errorf("Unauthorized User, not from pachyderm.io: %v \n", r.Approver)
 	}
-	oncall, err := lookupCurrentOnCall()
-	if err != nil {
-		return fmt.Errorf("Unable to get user info from pagerduty API: %v \n", err)
-	}
-	// TODO: Remove hardcoded exception for sean for testing
-	if string(r.Member) == r.Approver && r.Member != "sean@pachyderm.io" && !oncall[r.Member] {
-		return fmt.Errorf("Unauthorized, approver cannot be requester: %v \n", r.Approver)
-	}
-
-	var headerSection *slack.SectionBlock
-	var fieldsSection *slack.SectionBlock
 
 	if r.Status == Approved {
+		if !r.Oncall && string(r.Member) == r.Approver {
+			return fmt.Errorf("Unauthorized, approver cannot be requester: %v \n", r.Approver)
+		}
 		err := conditionalBindIAMPolicy(ctx, r.Member, "organizations/6487630834", "organizations/6487630834/roles/hub_on_call_elevated")
 		if err != nil {
 			return fmt.Errorf("Unable to set IAM policy: %v", err)
 		}
 	}
+	var headerSection *slack.SectionBlock
+	var fieldsSection *slack.SectionBlock
 
 	headerText := slack.NewTextBlockObject("mrkdwn", fmt.Sprint(r.Status.ApprovalText()), false, false)
 	headerSection = slack.NewSectionBlock(headerText, nil, nil)
@@ -117,6 +116,7 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 
 	r := &EscalationRequest{
 		Member:    member(strings.Replace(profile.Email, "@pachyderm.com", "@pachyderm.io", 1)),
+		Groups:    make(map[group]struct{}),
 		Role:      "organizations/6487630834/roles/hub_on_call_elevated",
 		Resource:  "organizations/6487630834",
 		Reason:    s.Text,
@@ -132,6 +132,12 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 	err = r.GetGroupMembership()
 	if err != nil {
 		log.Errorf("Unable to get group membership for user: %v \n", r.Member)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	r.Oncall, err = lookupCurrentOnCall(r.Member)
+	if err != nil {
+		log.Errorf("Can't retrieve groups from pagerduty: %v", err)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -157,11 +163,11 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 
 	// Approve and Deny Buttons
 	approveBtnTxt := slack.NewTextBlockObject("plain_text", "Approve", false, false)
-	approveBtn := slack.NewButtonBlockElement("id1234", fmt.Sprintf("APPROVAL,0,%s,%s,%s,%s", r.Member, r.Role, r.Timestamp, r.Reason), approveBtnTxt)
+	approveBtn := slack.NewButtonBlockElement("id1234", fmt.Sprintf("APPROVAL,0,%s,%s,%s,%s,%v", r.Member, r.Role, r.Timestamp, r.Reason, r.Oncall), approveBtnTxt)
 	approveBtn.WithStyle("danger")
 
 	denyBtnTxt := slack.NewTextBlockObject("plain_text", "Deny", false, false)
-	denyBtn := slack.NewButtonBlockElement("id123", fmt.Sprintf("APPROVAL,1,%s,%s,%s,%s", r.Member, r.Role, r.Timestamp, r.Reason), denyBtnTxt)
+	denyBtn := slack.NewButtonBlockElement("id123", fmt.Sprintf("APPROVAL,1,%s,%s,%s,%s,%v", r.Member, r.Role, r.Timestamp, r.Reason, r.Oncall), denyBtnTxt)
 
 	actionBlock := slack.NewActionBlock("", approveBtn, denyBtn)
 
@@ -170,7 +176,6 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 		fieldsSection,
 		actionBlock,
 	)
-
 	msg.ResponseType = "in_channel"
 	b, err := json.MarshalIndent(msg, "", "    ")
 	if err != nil {
@@ -269,21 +274,23 @@ func conditionalBindIAMPolicy(ctx context.Context, username member, orgId, IAMRo
 	}
 }
 
-func lookupCurrentOnCall() (map[member]bool, error) {
+func lookupCurrentOnCall(m member) (bool, error) {
 	oc, err := client.ListOnCalls(pagerduty.ListOnCallOptions{})
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	users := map[member]bool{}
 	for _, x := range oc.OnCalls {
 		// This is the hardcoded Hub EscalationPolicyID
 		if (x.EscalationLevel == 1 || x.EscalationLevel == 2) && x.EscalationPolicy.APIObject.ID == HubEscalationPolicyID {
 			user, err := client.GetUser(x.User.APIObject.ID, pagerduty.GetUserOptions{})
 			if err != nil {
-				return nil, err
+				return false, err
 			}
-			users[member(user.Email)] = true
+			if member(user.Email) == m {
+				log.Debug("Currently On Call")
+				return true, nil
+			}
 		}
 	}
-	return users, nil
+	return false, nil
 }

@@ -2,7 +2,6 @@ package gcpiamslack
 
 import (
 	"context"
-	"fmt"
 
 	"git.sr.ht/~urandom/dwd"
 	log "github.com/sirupsen/logrus"
@@ -50,35 +49,43 @@ type EscalationRequest struct {
 	Approver  string
 	Timestamp string
 	Status    approval
+	Oncall    bool
 }
 
 func (r *EscalationRequest) GetGroupMembership() error {
-	//TODO: Get group membership
 	ctx := context.Background()
+	// This is using a 3rd party lib because there is a long standing issue with
+	// the interplay between gsuite's admin sdk needing account impersonation and
+	// no 1st party support for that with existing GCP API's.
 
+	// https://github.com/googleapis/google-api-go-client/issues/652
+	// https://github.com/googleapis/google-api-go-client/issues/379
 	ts := dwd.TokenSource(
 		ctx,
-		"jdoliner@pachyderm.io", // User must be a GSuite admin.
-		admin.AdminDirectoryGroupReadOnlyScope,
+		// User must be a GSuite admin.
+		"jdoliner@pachyderm.io",
+		admin.AdminDirectoryGroupReadonlyScope,
 	)
-	//
-	srv, err := admin.NewService(ctx, option.WithScopes("https://www.googleapis.com/auth/admin.directory.group.readonly"))
+	srv, err := admin.NewService(ctx, option.WithTokenSource(ts))
 	if err != nil {
-		log.Fatalf("Unable to retrieve directory Client %v", err)
+		log.Errorf("Unable to retrieve directory Client %v", err)
+		return err
 	}
 	grpSrv := admin.NewGroupsService(srv)
 	groups, err := grpSrv.List().Domain("pachyderm.io").UserKey("sean@pachyderm.com").Do()
 	if err != nil {
-		fmt.Println(err)
+		log.Errorf("Can't retrieve groups from google: %v", err)
+		return err
 	}
-	log.Warn("Groups: %s", groups)
-	r.Groups["pd-current-oncall"] = struct{}{}
+	for _, g := range groups.Groups {
+		r.Groups[group(g.Email)] = struct{}{}
+	}
 	return nil
 }
 
 func (r *EscalationRequest) Authorize(policy *[]ACL) bool {
 	for _, p := range *policy {
-		for g, _ := range r.Groups {
+		for g := range r.Groups {
 			if _, ok := p.Groups[g]; !ok {
 				continue
 			}
