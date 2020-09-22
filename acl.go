@@ -72,7 +72,7 @@ func (r *EscalationRequest) GetGroupMembership() error {
 		return err
 	}
 	grpSrv := admin.NewGroupsService(srv)
-	groups, err := grpSrv.List().Domain("pachyderm.io").UserKey("sean@pachyderm.com").Do()
+	groups, err := grpSrv.List().Domain("pachyderm.io").UserKey(string(r.Member)).Do()
 	if err != nil {
 		log.Errorf("Can't retrieve groups from google: %v", err)
 		return err

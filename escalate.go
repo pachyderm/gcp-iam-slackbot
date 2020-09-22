@@ -287,7 +287,6 @@ func lookupCurrentOnCall(m member) (bool, error) {
 				return false, err
 			}
 			if member(user.Email) == m {
-				log.Debug("Currently On Call")
 				return true, nil
 			}
 		}
