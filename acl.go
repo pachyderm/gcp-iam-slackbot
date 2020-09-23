@@ -10,19 +10,25 @@ import (
 	"google.golang.org/api/option"
 )
 
-type approval int
+type approval bool
 
 const (
-	Approved approval = iota
-	Denied
+	Approved approval = true
+	Denied   approval = false
 )
 
 func (a approval) String() string {
-	return [...]string{"Approver", "Denier"}[a]
+	if a {
+		return "Approver"
+	}
+	return "Denier"
 }
 
 func (a approval) ApprovalText() string {
-	return [...]string{"Approved. The role has been granted for 1 hour.", "The Request has been denied."}[a]
+	if a {
+		return "Approved. The role has been granted for 1 hour."
+	}
+	return "The Request has been denied."
 }
 
 type group string
@@ -37,7 +43,6 @@ type ACL struct {
 	Groups    map[group]struct{}
 	Roles     map[role]struct{}
 	Resources map[resource]struct{}
-	// ApprovalGroup map[group]struct{}
 }
 
 type EscalationRequest struct {

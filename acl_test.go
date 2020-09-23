@@ -124,7 +124,7 @@ func TestAuthorize(t *testing.T) {
 			Groups:   map[group]struct{}{"test-group-3": struct{}{}},
 			Role:     "test-role-5",
 			Resource: "test-resource-6",
-		}, true},
+		}, false},
 	}
 	for _, tt := range tests {
 		tt := tt

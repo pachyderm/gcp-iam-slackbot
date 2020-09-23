@@ -21,13 +21,13 @@ import (
 func handleApproval(message slack.InteractionCallback) error {
 	ctx := context.Background()
 	actionInfo := strings.Split(message.ActionCallback.BlockActions[0].Value, ",")
-	approvalStatus, err := strconv.Atoi(actionInfo[1])
+	approvalStatus, err := strconv.ParseBool(actionInfo[1])
 	if err != nil {
-		return fmt.Errorf("Unable to parse approval status: %v \n", err)
+		return fmt.Errorf("invalid approval status: %v \n", err)
 	}
 	onCall, err := strconv.ParseBool(actionInfo[6])
 	if err != nil {
-		return fmt.Errorf("Unable to parse oncall status: %v \n", err)
+		return fmt.Errorf("invalid oncall status: %v", err)
 	}
 
 	r := &EscalationRequest{
@@ -42,16 +42,16 @@ func handleApproval(message slack.InteractionCallback) error {
 
 	profile, err := api.GetUserProfile(message.User.ID, true)
 	if err != nil {
-		return fmt.Errorf("Unable to get user info from slack API: %v \n", err)
+		return fmt.Errorf("Unable to get user info from slack: %v", err)
 	}
 	r.Approver = strings.Replace(profile.Email, "@pachyderm.com", "@pachyderm.io", 1)
 	if !strings.HasSuffix(r.Approver, "@pachyderm.io") {
-		return fmt.Errorf("Unauthorized User, not from pachyderm.io: %v \n", r.Approver)
+		return fmt.Errorf("Unauthorized User, not from pachyderm.io: %v", r.Approver)
 	}
 
 	if r.Status == Approved {
 		if !r.Oncall && string(r.Member) == r.Approver {
-			return fmt.Errorf("Unauthorized, approver cannot be requester: %v \n", r.Approver)
+			return fmt.Errorf("Unauthorized, approver cannot be requester: %v", r.Approver)
 		}
 		err := conditionalBindIAMPolicy(ctx, r.Member, "organizations/6487630834", "organizations/6487630834/roles/hub_on_call_elevated")
 		if err != nil {
@@ -89,12 +89,11 @@ func handleApproval(message slack.InteractionCallback) error {
 
 	b, err := json.MarshalIndent(msg, "", "    ")
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to marshal json: %v", err)
 	}
-	resp, err := http.Post(message.ResponseURL,
-		"application/json", bytes.NewBuffer(b))
+	resp, err := http.Post(message.ResponseURL, "application/json", bytes.NewReader(b))
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to send http request: %v", err)
 	}
 	defer resp.Body.Close()
 	return nil
@@ -109,7 +108,7 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 
 	profile, err := api.GetUserProfile(s.UserID, true)
 	if err != nil {
-		log.Errorf("Unable to get user info from slack API: %v \n", err)
+		log.Errorf("Unable to get user info from slack: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -120,18 +119,18 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 		Role:      "organizations/6487630834/roles/hub_on_call_elevated",
 		Resource:  "organizations/6487630834",
 		Reason:    s.Text,
-		Timestamp: time.Now().Format("Mon Jan 2 15:04:05 MST 2006"),
+		Timestamp: time.Now().Format(time.RFC1123),
 	}
 
 	if !strings.HasSuffix(string(r.Member), "@pachyderm.io") {
-		log.Errorf("Unauthorized User, not from pachyderm.io: %v \n", r.Member)
+		log.Errorf("Unauthorized User, not from pachyderm.io: %v", r.Member)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	err = r.GetGroupMembership()
 	if err != nil {
-		log.Errorf("Unable to get group membership for user: %v \n", r.Member)
+		log.Errorf("Unable to get group membership for user: %v", r.Member)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -143,7 +142,7 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 	}
 
 	if !r.Authorize(DefinedPolicy) {
-		log.Errorf("Unauthorized User, not in the list of approved users: %v \n", r.Member)
+		log.Errorf("Unauthorized User, not in the list of approved users: %v", r.Member)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -179,14 +178,14 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 	msg.ResponseType = "in_channel"
 	b, err := json.MarshalIndent(msg, "", "    ")
 	if err != nil {
+		log.Errorf("failed to marshal json: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(b)
 	if err != nil {
-		log.Errorf("Unable to send escalation request to slack: %v \n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Errorf("Unable to send escalation request to slack: %v", err)
 		return
 	}
 
@@ -251,7 +250,7 @@ func conditionalBindIAMPolicy(ctx context.Context, username member, orgId, IAMRo
 		// If it is not, the new policy will overwrite the existing policy.
 		// This will remove all existing permissions at the gcp org level!
 		if existingPolicy == nil {
-			return fmt.Errorf("Error: No existing policy was found for the GCP Organization")
+			return fmt.Errorf("No existing policy was found for the GCP Organization")
 		}
 		existingPolicy.Bindings = append(existingPolicy.Bindings, binding)
 		// In order to use conditional IAM, must set version to 3
