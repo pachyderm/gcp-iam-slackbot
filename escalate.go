@@ -135,12 +135,7 @@ func gcpEscalateIAM(w http.ResponseWriter, s slack.SlashCommand) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	r.Oncall, err = lookupCurrentOnCall(r.Member)
-	if err != nil {
-		log.Errorf("Can't retrieve groups from pagerduty: %v", err)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
+	r.Oncall = lookupCurrentOnCall(r.Member)
 
 	if !r.Authorize(DefinedPolicy) {
 		log.Errorf("Unauthorized User, not in the list of approved users: %v", r.Member)
@@ -274,22 +269,26 @@ func conditionalBindIAMPolicy(ctx context.Context, username member, orgId, IAMRo
 	}
 }
 
-func lookupCurrentOnCall(m member) (bool, error) {
+// This function doesn't return an error because it shouldn't be blocking
+// if unable to reach pagerduty - just disables self approval
+func lookupCurrentOnCall(m member) bool {
 	oc, err := client.ListOnCalls(pagerduty.ListOnCallOptions{})
 	if err != nil {
-		return false, err
+		log.Errorf("Unable to lookup pagerduty on calls: %v", err)
+		return false
 	}
 	for _, x := range oc.OnCalls {
 		// This is the hardcoded Hub EscalationPolicyID
 		if (x.EscalationLevel == 1 || x.EscalationLevel == 2) && x.EscalationPolicy.APIObject.ID == HubEscalationPolicyID {
 			user, err := client.GetUser(x.User.APIObject.ID, pagerduty.GetUserOptions{})
 			if err != nil {
-				return false, err
+				log.Errorf("Unable to lookup pagerduty user, %v", err)
+				return false
 			}
 			if member(user.Email) == m {
-				return true, nil
+				return true
 			}
 		}
 	}
-	return false, nil
+	return false
 }
