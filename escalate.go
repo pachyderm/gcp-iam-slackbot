@@ -21,6 +21,7 @@ import (
 func handleApproval(message slack.InteractionCallback) error {
 	ctx := context.Background()
 	actionInfo := strings.Split(message.ActionCallback.BlockActions[0].Value, ",")
+	log.Debugf(message.ActionCallback.BlockActions[0].Value)
 	approvalStatus, err := strconv.ParseBool(actionInfo[1])
 	if err != nil {
 		return fmt.Errorf("invalid approval status: %v \n", err)
