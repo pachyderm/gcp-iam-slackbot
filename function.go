@@ -105,6 +105,7 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch message.Type {
 	case "view_submission":
+		log.Debugf("Values: %v", message.View.State.Values)
 		firstName := message.View.State.Values["First Name"]["firstName"].Value
 		lastName := message.View.State.Values["Last Name"]["lastName"].Value
 

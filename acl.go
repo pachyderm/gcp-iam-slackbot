@@ -106,19 +106,19 @@ func (r *EscalationRequest) Authorize(policy *[]ACL) bool {
 }
 
 //Returns deduplicated lists of groups, roles and resources
-func ListOptions(policy *[]ACL) (map[group]struct{}, map[role]struct{}, map[resource]struct{}) {
-	groups := make(map[group]struct{})
-	roles := make(map[role]struct{})
-	resources := make(map[resource]struct{})
+func ListOptions(policy *[]ACL) (map[string]struct{}, map[string]struct{}, map[string]struct{}) {
+	groups := make(map[string]struct{})
+	roles := make(map[string]struct{})
+	resources := make(map[string]struct{})
 	for _, p := range *policy {
 		for g := range p.Groups {
-			groups[g] = struct{}{}
+			groups[string(g)] = struct{}{}
 		}
 		for rl := range p.Roles {
-			roles[rl] = struct{}{}
+			roles[string(rl)] = struct{}{}
 		}
-		for r := range p.Resources {
-			resources[r] = struct{}{}
+		for rsc := range p.Resources {
+			resources[string(rsc)] = struct{}{}
 		}
 	}
 	return groups, roles, resources

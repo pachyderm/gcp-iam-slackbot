@@ -2,6 +2,7 @@ package gcpiamslack
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -16,6 +17,13 @@ import (
 )
 
 func handleApproval(message slack.InteractionCallback) (slack.Message, error) {
+	log.Debug(message)
+	b, err := json.MarshalIndent(message, "", "    ")
+	fmt.Printf("ssss: %s", b)
+	log.Debug(b)
+	if err != nil {
+		return slack.Message{}, fmt.Errorf("Unable to marshal json: %v", err)
+	}
 	ctx := context.Background()
 	actionInfo := strings.Split(message.ActionCallback.BlockActions[0].Value, ",")
 	log.Debugf(message.ActionCallback.BlockActions[0].Value)
@@ -175,11 +183,11 @@ func generateSlackEscalationRequestMessage(r *EscalationRequest) slack.Message {
 
 	// Approve and Deny Buttons
 	approveBtnTxt := slack.NewTextBlockObject("plain_text", "Approve", false, false)
-	approveBtn := slack.NewButtonBlockElement("id1234", fmt.Sprintf("APPROVAL,0,%s,%s,%s,%s,%v", r.Member, r.Role, r.Timestamp, r.Reason, r.Oncall), approveBtnTxt)
+	approveBtn := slack.NewButtonBlockElement("id1234", fmt.Sprintf("APPROVAL,true,%s,%s,%s,%s,%v", r.Member, r.Role, r.Timestamp, r.Reason, r.Oncall), approveBtnTxt)
 	approveBtn.WithStyle("danger")
 
 	denyBtnTxt := slack.NewTextBlockObject("plain_text", "Deny", false, false)
-	denyBtn := slack.NewButtonBlockElement("id123", fmt.Sprintf("APPROVAL,1,%s,%s,%s,%s,%v", r.Member, r.Role, r.Timestamp, r.Reason, r.Oncall), denyBtnTxt)
+	denyBtn := slack.NewButtonBlockElement("id123", fmt.Sprintf("APPROVAL,false,%s,%s,%s,%s,%v", r.Member, r.Role, r.Timestamp, r.Reason, r.Oncall), denyBtnTxt)
 
 	actionBlock := slack.NewActionBlock("", approveBtn, denyBtn)
 
