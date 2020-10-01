@@ -46,15 +46,15 @@ type ACL struct {
 }
 
 type EscalationRequest struct {
-	Member    member
-	Groups    map[group]struct{}
-	Role      role
-	Resource  resource
-	Reason    string
-	Approver  string
-	Timestamp string
-	Status    approval
-	Oncall    bool
+	Member    member             `json:"member"`
+	Groups    map[group]struct{} `json:"groups"`
+	Role      role               `json:"role"`
+	Resource  resource           `json:"resource"`
+	Reason    string             `json:"reason"`
+	Approver  string             `json:"approver"`
+	Timestamp string             `json:"timestamp"`
+	Status    approval           `json:"status"`
+	Oncall    bool               `json:"oncall"`
 }
 
 func (r *EscalationRequest) GetGroupMembership() error {

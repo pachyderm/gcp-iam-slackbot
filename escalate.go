@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -17,40 +16,44 @@ import (
 )
 
 func handleApproval(message slack.InteractionCallback) (slack.Message, error) {
-	log.Debug(message)
-	b, err := json.MarshalIndent(message, "", "    ")
-	fmt.Printf("ssss: %s", b)
-	log.Debug(b)
-	if err != nil {
-		return slack.Message{}, fmt.Errorf("Unable to marshal json: %v", err)
-	}
+	//log.Debug(message)
+	//b, err := json.MarshalIndent(message, "", "    ")
+	//fmt.Printf("ssss: %s", b)
+	//log.Debug(b)
+	//if err != nil {
+	//	return slack.Message{}, fmt.Errorf("Unable to marshal json: %v", err)
+	//}
 	ctx := context.Background()
-	actionInfo := strings.Split(message.ActionCallback.BlockActions[0].Value, ",")
-	log.Debugf(message.ActionCallback.BlockActions[0].Value)
-	approvalStatus, err := strconv.ParseBool(actionInfo[1])
-	if err != nil {
-		return slack.Message{}, fmt.Errorf("invalid approval status: %v \n", err)
+	var r *EscalationRequest
+	if err := json.Unmarshal([]byte(message.ActionCallback.BlockActions[0].Value), &r); err != nil {
+		return slack.Message{}, fmt.Errorf("can't unmarshal json: %v", err)
 	}
-	onCall, err := strconv.ParseBool(actionInfo[6])
-	if err != nil {
-		return slack.Message{}, fmt.Errorf("invalid oncall status: %v", err)
-	}
+	//actionInfo := strings.Split(message.ActionCallback.BlockActions[0].Value, ",")
+	//log.Debugf(message.ActionCallback.BlockActions[0].Value)
+	//approvalStatus, err := strconv.ParseBool(actionInfo[1])
+	//if err != nil {
+	//	return slack.Message{}, fmt.Errorf("invalid approval status: %v", err)
+	//}
+	//onCall, err := strconv.ParseBool(actionInfo[6])
+	//if err != nil {
+	//	return slack.Message{}, fmt.Errorf("invalid oncall status: %v", err)
+	//}
 
-	r := &EscalationRequest{
-		Member:    member(actionInfo[2]),
-		Role:      role(actionInfo[3]),
-		Resource:  "organizations/6487630834",
-		Reason:    actionInfo[5],
-		Timestamp: actionInfo[4],
-		Status:    approval(approvalStatus),
-		Oncall:    onCall,
-	}
+	//r := &EscalationRequest{
+	//	Member:    member(actionInfo[2]),
+	//	Role:      role(actionInfo[3]),
+	//	Resource:  "organizations/6487630834",
+	//	Reason:    actionInfo[5],
+	//	Timestamp: actionInfo[4],
+	//	Status:    approval(approvalStatus),
+	//	Oncall:    onCall,
+	//}
 
-	profile, err := api.GetUserProfile(message.User.ID, true)
+	approverProfile, err := api.GetUserProfile(message.User.ID, true)
 	if err != nil {
 		return slack.Message{}, fmt.Errorf("Unable to get user info from slack: %v", err)
 	}
-	r.Approver = strings.Replace(profile.Email, "@pachyderm.com", "@pachyderm.io", 1)
+	r.Approver = strings.Replace(approverProfile.Email, "@pachyderm.com", "@pachyderm.io", 1)
 	if !strings.HasSuffix(r.Approver, "@pachyderm.io") {
 		return slack.Message{}, fmt.Errorf("Unauthorized User, not from pachyderm.io: %v", r.Approver)
 	}
@@ -59,7 +62,7 @@ func handleApproval(message slack.InteractionCallback) (slack.Message, error) {
 		if !r.Oncall && string(r.Member) == r.Approver {
 			return slack.Message{}, fmt.Errorf("Unauthorized, approver cannot be requester: %v", r.Approver)
 		}
-		err := conditionalBindIAMPolicy(ctx, r.Member, "organizations/6487630834", "organizations/6487630834/roles/hub_on_call_elevated")
+		err := conditionalBindIAMPolicy(ctx, r.Member, r.Resource, "organizations/6487630834/roles/hub_on_call_elevated")
 		if err != nil {
 			return slack.Message{}, fmt.Errorf("Unable to set IAM policy: %v", err)
 		}
@@ -102,7 +105,7 @@ func generateSlackEscalationResponseMessage(r *EscalationRequest) slack.Message 
 
 }
 
-func parseEscalationResponse(s slack.SlashCommand) (*EscalationRequest, error) {
+func parseInitialEscalationRequest(s slack.SlashCommand) (*EscalationRequest, error) {
 	profile, err := api.GetUserProfile(s.UserID, true)
 	if err != nil {
 		return nil, fmt.Errorf("can't get user info from slack: %v", err)
@@ -137,7 +140,7 @@ func handleGCPEscalateIAMRequest(s slack.SlashCommand) (slack.Message, error) {
 	//	Timestamp: time.Now().Format(time.RFC822),
 	//}
 
-	r, err := parseEscalationResponse(s)
+	r, err := parseInitialEscalationRequest(s)
 	if err != nil {
 		return slack.Message{}, fmt.Errorf("can't parse escalation request")
 	}
@@ -183,11 +186,22 @@ func generateSlackEscalationRequestMessage(r *EscalationRequest) slack.Message {
 
 	// Approve and Deny Buttons
 	approveBtnTxt := slack.NewTextBlockObject("plain_text", "Approve", false, false)
-	approveBtn := slack.NewButtonBlockElement("id1234", fmt.Sprintf("APPROVAL,true,%s,%s,%s,%s,%v", r.Member, r.Role, r.Timestamp, r.Reason, r.Oncall), approveBtnTxt)
+	r.Status = Approved
+	buttonPayloadApproval, err := json.Marshal(&r)
+	if err != nil {
+		log.Errorf("can't marshal json: %v", err)
+	}
+	//approveBtn := slack.NewButtonBlockElement("id1234", fmt.Sprintf("APPROVAL,true,%s,%s,%s,%s,%v", r.Member, r.Role, r.Timestamp, r.Reason, r.Oncall), approveBtnTxt)
+	approveBtn := slack.NewButtonBlockElement("id1234", string(buttonPayloadApproval), approveBtnTxt)
 	approveBtn.WithStyle("danger")
 
 	denyBtnTxt := slack.NewTextBlockObject("plain_text", "Deny", false, false)
-	denyBtn := slack.NewButtonBlockElement("id123", fmt.Sprintf("APPROVAL,false,%s,%s,%s,%s,%v", r.Member, r.Role, r.Timestamp, r.Reason, r.Oncall), denyBtnTxt)
+	r.Status = Denied
+	buttonPayloadDenial, err := json.Marshal(&r)
+	if err != nil {
+		log.Errorf("can't marshal json: %v", err)
+	}
+	denyBtn := slack.NewButtonBlockElement("id123", string(buttonPayloadDenial), denyBtnTxt)
 
 	actionBlock := slack.NewActionBlock("", approveBtn, denyBtn)
 
@@ -206,7 +220,7 @@ func generateSlackEscalationRequestMessage(r *EscalationRequest) slack.Message {
 // If you do not append your policy changes to an existing policy,
 // it is very easy to get the gcp organization into a bad state.
 // Please take a look at the comment in the critical section before making changes
-func conditionalBindIAMPolicy(ctx context.Context, username member, orgId, IAMRole string) error {
+func conditionalBindIAMPolicy(ctx context.Context, username member, resource resource, IAMRole string) error {
 	log.Debug("Getting IAM Policy")
 
 	cloudResourceManagerService, err := cloudresourcemanager.NewService(ctx)
@@ -244,7 +258,7 @@ func conditionalBindIAMPolicy(ctx context.Context, username member, orgId, IAMRo
 	for {
 		d := b.Duration()
 		//existingPolicy
-		existingPolicy, err := cloudResourceManagerService.Organizations.GetIamPolicy(orgId, getIamPolicyRequest).Context(ctx).Do()
+		existingPolicy, err := cloudResourceManagerService.Organizations.GetIamPolicy(string(resource), getIamPolicyRequest).Context(ctx).Do()
 		if e, ok := err.(*googleapi.Error); ok {
 			if e.Code == 409 {
 				time.Sleep(d)
@@ -269,7 +283,7 @@ func conditionalBindIAMPolicy(ctx context.Context, username member, orgId, IAMRo
 		setIamPolicyRequest := &cloudresourcemanager.SetIamPolicyRequest{
 			Policy: existingPolicy,
 		}
-		_, err = cloudResourceManagerService.Organizations.SetIamPolicy(orgId, setIamPolicyRequest).Context(ctx).Do()
+		_, err = cloudResourceManagerService.Organizations.SetIamPolicy(string(resource), setIamPolicyRequest).Context(ctx).Do()
 		if e, ok := err.(*googleapi.Error); ok {
 			if e.Code == 409 {
 				time.Sleep(d)
