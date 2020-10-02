@@ -20,16 +20,22 @@ func generateModalRequest() slack.ModalViewRequest {
 
 	reasonText := slack.NewTextBlockObject("plain_text", "Reason", false, false)
 	reasonPlaceholder := slack.NewTextBlockObject("plain_text", "Enter the reason for the request", false, false)
-	reasonElement := slack.NewPlainTextInputBlockElement(reasonPlaceholder, "reason")
-	reasonBlock := slack.NewInputBlock("GCP_Reason", reasonText, reasonElement)
+	reasonElement := slack.NewPlainTextInputBlockElement(reasonPlaceholder, "reasonz")
+	reasonBlock := slack.NewInputBlock("gcp_reason", reasonText, reasonElement)
 
 	roleText := slack.NewTextBlockObject(slack.PlainTextType, "List of Roles", false, false)
-	roleOption := slack.NewOptionsSelectBlockElement(slack.OptTypeStatic, nil, "role", roleOpts...)
+	roleOption := slack.NewOptionsSelectBlockElement(slack.OptTypeStatic, nil, "rolez", roleOpts...)
 	roleBlock := slack.NewInputBlock("gcp_role", roleText, roleOption)
 
 	resourceText := slack.NewTextBlockObject(slack.PlainTextType, "List of Resources", false, false)
-	resourceOption := slack.NewOptionsSelectBlockElement(slack.OptTypeStatic, nil, "resource", resourceOpts...)
+	resourceOption := slack.NewOptionsSelectBlockElement(slack.OptTypeStatic, nil, "resourcez", resourceOpts...)
 	resourceBlock := slack.NewInputBlock("gcp_resource", resourceText, resourceOption)
+
+	// responseText := slack.NewTextBlockObject(slack.PlainTextType, "responsez", false, false)
+	// responseOption := slack.NewOptionsSelectBlockElement(slack.OptTypeConversations, nil, "responsezz")
+	// responseOption.ResponseURLEnabled = false
+	// responseOption.DefaultToCurrentConversation = true
+	// responseBlock := slack.NewInputBlock("gcp_responsez", responseText, responseOption)
 
 	blocks := slack.Blocks{
 		BlockSet: []slack.Block{
@@ -37,6 +43,7 @@ func generateModalRequest() slack.ModalViewRequest {
 			reasonBlock,
 			resourceBlock,
 			roleBlock,
+			//		responseBlock,
 		},
 	}
 

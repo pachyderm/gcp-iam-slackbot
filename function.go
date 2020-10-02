@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/PagerDuty/go-pagerduty"
 	log "github.com/sirupsen/logrus"
@@ -76,7 +75,7 @@ func SlashHandler(w http.ResponseWriter, r *http.Request) {
 			log.Errorf("Unable to send escalation request to slack: %v", err)
 			return
 		}
-	case "/modaltest":
+	case "/escalate-v2":
 		modalRequest := generateModalRequest()
 		_, err = api.OpenView(s.TriggerID, modalRequest)
 		if err != nil {
@@ -105,48 +104,53 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch message.Type {
 	case "view_submission":
-		log.Debugf("Values: %v", message.View.State.Values)
-		firstName := message.View.State.Values["First Name"]["firstName"].Value
-		lastName := message.View.State.Values["Last Name"]["lastName"].Value
-
-		msg := fmt.Sprintf("Hello %s %s, nice to meet you!", firstName, lastName)
-		_, _, err = api.PostMessage(message.User.ID,
-			slack.MsgOptionText(msg, false),
-			slack.MsgOptionAttachments())
+		//send an empty acceptance response
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write([]byte{})
 		if err != nil {
-			log.Errorf("Unable to complete modal action: %v", err)
-			w.WriteHeader(http.StatusUnauthorized)
+			log.Errorf("Unable to send ok response to slack: %v", err)
 			return
 		}
-	case "block_actions":
-		actionInfo := strings.Split(message.ActionCallback.BlockActions[0].Value, ",")
-		log.Infof("ActionInfo: %v", actionInfo)
-		switch actionInfo[0] {
-		case "APPROVAL":
-			msg, err := handleApproval(message)
-			if err != nil {
-				log.Errorf("Unable to complete approval action: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			b, err := json.MarshalIndent(msg, "", "    ")
-			if err != nil {
-				log.Errorf("Unable to marshal json: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
 
-			}
-			resp, err := http.Post(message.ResponseURL, "application/json", bytes.NewReader(b))
-			if err != nil {
-				log.Errorf("Unable to send http request: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-
-			}
-			defer resp.Body.Close()
-		default:
-			log.Errorf("Unsupported Action")
+		reason := message.View.State.Values["gcp_reason"]["reasonz"].Value
+		role := role(message.View.State.Values["gcp_role"]["rolez"].SelectedOption.Value)
+		resource := resource(message.View.State.Values["gcp_resource"]["resourcez"].SelectedOption.Value)
+		msg, err := handleGCPEscalateIAMRequestFromModal(role, resource, reason, message.User.ID)
+		if err != nil {
+			log.Errorf("couldn't handle escalation request: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		//https://pachyderm.slack.com/archives/C01BPEQ024E
+		_, _, err = api.PostMessage("C01BPEQ024E", msg)
+		if err != nil {
+			log.Errorf("Unable to complete modal action: %v", err)
+			return
+		}
+	case "block_actions":
+		msg, err := handleApproval(message)
+		if err != nil {
+			log.Errorf("Unable to complete approval action: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		b, err := json.MarshalIndent(msg, "", "    ")
+		if err != nil {
+			log.Errorf("Unable to marshal json: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+
+		}
+		resp, err := http.Post(message.ResponseURL, "application/json", bytes.NewReader(b))
+		if err != nil {
+			log.Errorf("Unable to send http request: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+
+		}
+		defer resp.Body.Close()
+	default:
+		log.Errorf("Unsupported Action")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 }
 
