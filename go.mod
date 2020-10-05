@@ -8,5 +8,6 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/slack-go/slack v0.6.6
+	golang.org/x/net v0.0.0-20200822124328-c89045814202
 	google.golang.org/api v0.32.0
 )

@@ -53,36 +53,18 @@ func SlashHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, err = w.Write(b)
 		if err != nil {
-			log.Error("Unable to send echo response to slack")
+			log.Error("sending echo response to slack")
 			w.WriteHeader(http.StatusInternalServerError)
-		}
-	case "/escalate":
-		msg, err := handleGCPEscalateIAMRequest(s)
-		if err != nil {
-			log.Errorf("couldn't handle escalation request: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		b, err := json.MarshalIndent(msg, "", "    ")
-		if err != nil {
-			log.Errorf("failed to marshal json: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, err = w.Write(b)
-		if err != nil {
-			log.Errorf("Unable to send escalation request to slack: %v", err)
-			return
 		}
 	case "/escalate-v2":
 		modalRequest := generateModalRequest()
 		_, err = api.OpenView(s.TriggerID, modalRequest)
 		if err != nil {
-			log.Errorf("Error opening view: %s", err)
+			log.Errorf("opening view: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 	default:
-		log.Error("Unsupported Slash Command")
+		log.Error("unsupported slash command")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -97,7 +79,7 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 	var message slack.InteractionCallback
 	err := json.Unmarshal([]byte(r.FormValue("payload")), &message)
 	if err != nil {
-		log.Errorf("Could not parse action response JSON: %v", err)
+		log.Errorf("invalid action response json: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -108,14 +90,17 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write([]byte{})
 		if err != nil {
-			log.Errorf("Unable to send ok response to slack: %v", err)
+			log.Errorf("sending ok response to slack: %v", err)
 			return
 		}
-
-		reason := message.View.State.Values["gcp_reason"]["reasonz"].Value
-		role := role(message.View.State.Values["gcp_role"]["rolez"].SelectedOption.Value)
-		resource := resource(message.View.State.Values["gcp_resource"]["resourcez"].SelectedOption.Value)
-		msg, err := handleGCPEscalateIAMRequestFromModal(role, resource, reason, message.User.ID)
+		escalationRequest, err := parseEscalationRequestFromModal(message)
+		if err != nil {
+			log.Errorf("invalid modal: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		er := NewER(escalationRequest)
+		msg, err := er.handleGCPEscalateIAMRequestFromModal()
 		if err != nil {
 			log.Errorf("couldn't handle escalation request: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -124,45 +109,52 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 		//https://pachyderm.slack.com/archives/C01BPEQ024E
 		_, _, err = api.PostMessage("C01BPEQ024E", msg)
 		if err != nil {
-			log.Errorf("Unable to complete modal action: %v", err)
+			log.Errorf("can't complete modal action: %v", err)
 			return
 		}
 	case "block_actions":
-		msg, err := handleApproval(message)
+		escalationRequest, err := parseEscalationRequestFromApproval(message)
 		if err != nil {
-			log.Errorf("Unable to complete approval action: %v", err)
+			log.Errorf("invalid escaltion request: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		er := NewER(escalationRequest)
+		msg, err := er.handleApproval()
+		if err != nil {
+			log.Errorf("can't complete approval action: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		b, err := json.MarshalIndent(msg, "", "    ")
 		if err != nil {
-			log.Errorf("Unable to marshal json: %v", err)
+			log.Errorf("marshalling json: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 
 		}
 		resp, err := http.Post(message.ResponseURL, "application/json", bytes.NewReader(b))
 		if err != nil {
-			log.Errorf("Unable to send http request: %v", err)
+			log.Errorf("sending http request: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 
 		}
 		defer resp.Body.Close()
 	default:
-		log.Errorf("Unsupported Action")
+		log.Errorf("unsupported action")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
 
 func verifyAuth(w http.ResponseWriter, r *http.Request) error {
-	log.Debug("Verifying Auth")
+	log.Debug("verifying auth")
 
 	// Read request body
 	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		return fmt.Errorf("[ERROR] Fail to read request body: %v", err)
+		return fmt.Errorf("invalid request body: %v", err)
 	}
 	// Reset request body for other methods to act on
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
@@ -170,15 +162,15 @@ func verifyAuth(w http.ResponseWriter, r *http.Request) error {
 	verifier, err := slack.NewSecretsVerifier(r.Header, signingSecret)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		return fmt.Errorf("Failed to verify SigningSecret: %v", err)
+		return fmt.Errorf("failed to verify SigningSecret: %v", err)
 	}
 	if _, err := verifier.Write(body); err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		return fmt.Errorf("[ERROR] Fail to verify SigningSecret: %v", err)
+		return fmt.Errorf("failed to verify SigningSecret: %v", err)
 	}
 	if err := verifier.Ensure(); err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		return fmt.Errorf("Failed to verify SigningSecret: %v", err)
+		return fmt.Errorf("failed to verify SigningSecret: %v", err)
 	}
 	return nil
 }
