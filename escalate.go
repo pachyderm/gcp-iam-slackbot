@@ -39,7 +39,7 @@ func NewER(r *EscalationRequest) *ER {
 	return &ER{Client: client, EscalationRequest: r}
 }
 
-func (er *ER) handleGCPEscalateIAMRequestFromModal() (slack.MsgOption, error) {
+func (er *ER) handleGCPEscalateIAMRequestFromModal() ([]slack.Block, error) {
 	log.Debug("slash command escalate")
 
 	if !strings.HasSuffix(string(er.Member), "@pachyderm.io") {
@@ -61,27 +61,27 @@ func (er *ER) handleGCPEscalateIAMRequestFromModal() (slack.MsgOption, error) {
 	return msg, nil
 }
 
-func (er *ER) handleApproval() (slack.Message, error) {
+func (er *ER) handleApproval() ([]slack.Block, error) {
 	ctx := context.Background()
 
 	if !strings.HasSuffix(er.Approver, "@pachyderm.io") {
-		return slack.Message{}, fmt.Errorf("unauthorized user, not from pachyderm.io: %v", er.Approver)
+		return nil, fmt.Errorf("unauthorized user, not from pachyderm.io: %v", er.Approver)
 	}
 
 	if er.Status == Approved {
 		if !er.Oncall && string(er.Member) == er.Approver {
-			return slack.Message{}, fmt.Errorf("unauthorized, approver cannot be requester: %v", er.Approver)
+			return nil, fmt.Errorf("unauthorized, approver cannot be requester: %v", er.Approver)
 		}
 		err := er.Client.conditionalBindIAMPolicy(ctx, er.EscalationRequest)
 		if err != nil {
-			return slack.Message{}, fmt.Errorf("couldn't set IAM policy: %v", err)
+			return nil, fmt.Errorf("couldn't set IAM policy: %v", err)
 		}
 	}
 	log.Infof("[AUDIT] Requestor: %s, Role: %s, When: %s, Reason: %s, %s: %s", er.Member,
 		er.Role, er.Timestamp, er.Reason, er.Status.String(), er.Approver)
 
-	msg := generateSlackEscalationResponseMessage(er.EscalationRequest)
-	return msg, nil
+	blocks := generateSlackEscalationResponseMessage(er.EscalationRequest)
+	return blocks, nil
 }
 
 func parseEscalationRequestFromApproval(message slack.InteractionCallback) (*EscalationRequest, error) {

@@ -52,7 +52,7 @@ func generateModalRequest() slack.ModalViewRequest {
 	return modalRequest
 }
 
-func generateSlackEscalationRequestMessageFromModal(r *EscalationRequest) slack.MsgOption {
+func generateSlackEscalationRequestMessageFromModal(r *EscalationRequest) []slack.Block {
 
 	// Header Section
 	headerText := slack.NewTextBlockObject("mrkdwn", "There is a new authentication request to escalate GCP privileges", false, false)
@@ -91,15 +91,15 @@ func generateSlackEscalationRequestMessageFromModal(r *EscalationRequest) slack.
 
 	actionBlock := slack.NewActionBlock("", approveBtn, denyBtn)
 
-	msg := slack.MsgOptionBlocks(
+	msg := []slack.Block{
 		headerSection,
 		fieldsSection,
 		actionBlock,
-	)
+	}
 	return msg
 }
 
-func generateSlackEscalationResponseMessage(r *EscalationRequest) slack.Message {
+func generateSlackEscalationResponseMessage(r *EscalationRequest) []slack.Block {
 	var headerSection *slack.SectionBlock
 	var fieldsSection *slack.SectionBlock
 
@@ -120,13 +120,11 @@ func generateSlackEscalationResponseMessage(r *EscalationRequest) slack.Message 
 	fieldSlice = append(fieldSlice, approverField)
 
 	fieldsSection = slack.NewSectionBlock(nil, fieldSlice, nil)
-	msg := slack.NewBlockMessage(
+	blocks := []slack.Block{
 		headerSection,
 		fieldsSection,
-	)
-	msg.ResponseType = "in_channel"
-	msg.ReplaceOriginal = true
-	return msg
+	}
+	return blocks
 
 }
 

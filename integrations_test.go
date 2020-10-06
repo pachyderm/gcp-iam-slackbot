@@ -21,10 +21,7 @@ func (i *TestIntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r 
 }
 
 func (i *TestIntegrationClient) lookupCurrentOnCall(r *EscalationRequest) bool {
-	if member("test-user@pachyderm.io") == r.Member {
-		return true
-	}
-	return false
+	return member("test-user@pachyderm.io") == r.Member
 }
 
 // This doesn't use any pagerduty credentials because it's testing a failing lookup

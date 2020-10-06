@@ -15,6 +15,8 @@ import (
 	"google.golang.org/api/option"
 )
 
+// This file contains code related to GCP and Pagerduty integrations
+
 type IntegrationClient struct{}
 
 func NewIntegrationClient() *IntegrationClient {
@@ -52,8 +54,7 @@ func (i *IntegrationClient) getGroupMembership(r *EscalationRequest) error {
 	return nil
 }
 
-// This package contains code related to GCP and Pagerduty integrations
-
+// TODO: Need to support single project functionality here based on resource
 // Attaches specific iam roles to a given user conditionally.
 // Notably, this policy overwrites any existing policies.
 // If you do not append your policy changes to an existing policy,

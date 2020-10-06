@@ -56,7 +56,7 @@ func SlashHandler(w http.ResponseWriter, r *http.Request) {
 			log.Error("sending echo response to slack")
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-	case "/escalate-v2":
+	case "/escalate":
 		modalRequest := generateModalRequest()
 		_, err = api.OpenView(s.TriggerID, modalRequest)
 		if err != nil {
@@ -99,13 +99,15 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
 		er := NewER(escalationRequest)
-		msg, err := er.handleGCPEscalateIAMRequestFromModal()
+		blocks, err := er.handleGCPEscalateIAMRequestFromModal()
 		if err != nil {
 			log.Errorf("couldn't handle escalation request: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		msg := slack.MsgOptionBlocks(blocks...)
 		//https://pachyderm.slack.com/archives/C01BPEQ024E
 		_, _, err = api.PostMessage("C01BPEQ024E", msg)
 		if err != nil {
@@ -120,12 +122,15 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		er := NewER(escalationRequest)
-		msg, err := er.handleApproval()
+		blocks, err := er.handleApproval()
 		if err != nil {
 			log.Errorf("can't complete approval action: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		msg := slack.NewBlockMessage(blocks...)
+		msg.ResponseType = "in_channel"
+		msg.ReplaceOriginal = true
 		b, err := json.MarshalIndent(msg, "", "    ")
 		if err != nil {
 			log.Errorf("marshalling json: %v", err)
