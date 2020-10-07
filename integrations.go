@@ -136,7 +136,6 @@ func (i *IntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r *Esc
 	}
 }
 
-// This function doesn't return an error because it shouldn't be blocking
 // if unable to reach pagerduty - just disables self approval
 func (i *IntegrationClient) lookupCurrentOnCall(r *EscalationRequest) bool {
 	oc, err := client.ListOnCalls(pagerduty.ListOnCallOptions{})
