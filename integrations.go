@@ -39,13 +39,13 @@ func (i *IntegrationClient) getGroupMembership(r *EscalationRequest) error {
 	)
 	srv, err := admin.NewService(ctx, option.WithTokenSource(ts))
 	if err != nil {
-		log.Errorf("Unable to retrieve directory Client %v", err)
+		log.Errorf("can't initialize admin sdk %v", err)
 		return err
 	}
 	grpSrv := admin.NewGroupsService(srv)
-	groups, err := grpSrv.List().Domain("pachyderm.io").UserKey(string(r.Member)).Do()
+	groups, err := grpSrv.List().Domain("pachyderm.io").UserKey(string(r.Requestor)).Do()
 	if err != nil {
-		log.Errorf("Can't retrieve groups from google: %v", err)
+		log.Errorf("can't retrieve groups from google: %v", err)
 		return err
 	}
 	for _, g := range groups.Groups {
@@ -68,7 +68,7 @@ func (i *IntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r *Esc
 		return fmt.Errorf("failed to initialize google cloudresourcemanager: %v", err)
 	}
 
-	userEmail := []string{fmt.Sprintf("user:%s", r.Member)}
+	userEmail := []string{fmt.Sprintf("user:%s", r.Requestor)}
 	start := time.Now()
 	hourFromNow := start.Add(time.Hour).Format(time.RFC3339)
 	log.Debugf("Timestamp: %s", hourFromNow)
@@ -97,7 +97,6 @@ func (i *IntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r *Esc
 	}
 	for {
 		d := b.Duration()
-		//existingPolicy
 		existingPolicy, err := cloudResourceManagerService.Organizations.GetIamPolicy(string(r.Resource), getIamPolicyRequest).Context(ctx).Do()
 		if e, ok := err.(*googleapi.Error); ok {
 			if e.Code == 409 {
@@ -153,7 +152,7 @@ func (i *IntegrationClient) lookupCurrentOnCall(r *EscalationRequest) bool {
 				log.Errorf("Unable to lookup pagerduty user, %v", err)
 				return false
 			}
-			if member(user.Email) == r.Member {
+			if requestor(user.Email) == r.Requestor {
 				return true
 			}
 		}

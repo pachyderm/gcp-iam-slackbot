@@ -155,6 +155,10 @@ github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
+github.com/ugorji/go v1.1.10 h1:Mh7W3N/hGJJ8fRQNHIgomNTa0CgZc0aKDFvbgHl+U7A=
+github.com/ugorji/go v1.1.10/go.mod h1:/tC+H0R6N4Lcv4DoSdphIa9y/RAs4QFHDtN9W2oQcHw=
+github.com/ugorji/go/codec v1.1.10 h1:otofY/FAoRTMVqlVeDv/Kpm04D13lfJdrDqPbc3axg4=
+github.com/ugorji/go/codec v1.1.10/go.mod h1:jdPQoxvTq1mb8XV6RmofOz5UgNKV2czR6xvxXGwy1Bo=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

@@ -12,7 +12,7 @@ import (
 )
 
 type EscalationRequest struct {
-	Member    member             `json:"member"`
+	Requestor requestor          `json:"requestor"`
 	Groups    map[group]struct{} `json:"groups"`
 	Role      role               `json:"role"`
 	Resource  resource           `json:"resource"`
@@ -42,19 +42,19 @@ func NewER(r *EscalationRequest) *ER {
 func (er *ER) handleGCPEscalateIAMRequestFromModal() ([]slack.Block, error) {
 	log.Debug("slash command escalate")
 
-	if !strings.HasSuffix(string(er.Member), "@pachyderm.io") {
-		return nil, fmt.Errorf("unauthorized user, not from pachyderm.io: %v", er.Member)
+	if !strings.HasSuffix(string(er.Requestor), "@pachyderm.io") {
+		return nil, fmt.Errorf("unauthorized user, not from pachyderm.io: %v", er.Requestor)
 
 	}
 
 	err := er.Client.getGroupMembership(er.EscalationRequest)
 	if err != nil {
-		return nil, fmt.Errorf("can't get group membership for user: %v", er.Member)
+		return nil, fmt.Errorf("can't get group membership for user: %v", er.Requestor)
 	}
 	er.Oncall = er.Client.lookupCurrentOnCall(er.EscalationRequest)
 
 	if !EscalationPolicy.Authorize(er.EscalationRequest) {
-		return nil, fmt.Errorf("unauthorized: %v", er.Member)
+		return nil, fmt.Errorf("unauthorized: %v", er.Requestor)
 	}
 
 	msg := generateSlackEscalationRequestMessageFromModal(er.EscalationRequest)
@@ -68,8 +68,11 @@ func (er *ER) handleApproval() ([]slack.Block, error) {
 		return nil, fmt.Errorf("unauthorized user, not from pachyderm.io: %v", er.Approver)
 	}
 
+	log.Infof("[AUDIT] Requestor: %s, Role: %s, When: %s, Reason: %s, %s: %s", er.Requestor,
+		er.Role, er.Timestamp, er.Reason, er.Status.String(), er.Approver)
+
 	if er.Status == Approved {
-		if !er.Oncall && string(er.Member) == er.Approver {
+		if !er.Oncall && string(er.Requestor) == er.Approver {
 			return nil, fmt.Errorf("unauthorized, approver cannot be requester: %v", er.Approver)
 		}
 		err := er.Client.conditionalBindIAMPolicy(ctx, er.EscalationRequest)
@@ -77,8 +80,6 @@ func (er *ER) handleApproval() ([]slack.Block, error) {
 			return nil, fmt.Errorf("couldn't set IAM policy: %v", err)
 		}
 	}
-	log.Infof("[AUDIT] Requestor: %s, Role: %s, When: %s, Reason: %s, %s: %s", er.Member,
-		er.Role, er.Timestamp, er.Reason, er.Status.String(), er.Approver)
 
 	blocks := generateSlackEscalationResponseMessage(er.EscalationRequest)
 	return blocks, nil
@@ -102,14 +103,14 @@ func parseEscalationRequestFromModal(message slack.InteractionCallback) (*Escala
 	if err != nil {
 		return nil, fmt.Errorf("can't get user info from slack: %v", err)
 	}
-	requestor := member(strings.Replace(profile.Email, "@pachyderm.com", "@pachyderm.io", 1))
+	requestor := requestor(strings.Replace(profile.Email, "@pachyderm.com", "@pachyderm.io", 1))
 
 	reason := message.View.State.Values["gcp_reason"]["reasonz"].Value
 	role := role(message.View.State.Values["gcp_role"]["rolez"].SelectedOption.Value)
 	resource := resource(message.View.State.Values["gcp_resource"]["resourcez"].SelectedOption.Value)
 
 	r := &EscalationRequest{
-		Member:    requestor,
+		Requestor: requestor,
 		Groups:    make(map[group]struct{}),
 		Role:      role,
 		Resource:  resource,

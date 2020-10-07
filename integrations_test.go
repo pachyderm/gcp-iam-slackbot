@@ -21,14 +21,14 @@ func (i *TestIntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r 
 }
 
 func (i *TestIntegrationClient) lookupCurrentOnCall(r *EscalationRequest) bool {
-	return member("test-user@pachyderm.io") == r.Member
+	return requestor("test-user@pachyderm.io") == r.Requestor
 }
 
 // This doesn't use any pagerduty credentials because it's testing a failing lookup
 // should not be blocking behavior
 func TestLookupCurrentOnCall(t *testing.T) {
 	t.Run("ListOptions", func(t *testing.T) {
-		r := &EscalationRequest{Member: "test@example.com"}
+		r := &EscalationRequest{Requestor: "test@example.com"}
 		i := NewIntegrationClient()
 		got := i.lookupCurrentOnCall(r)
 		want := false

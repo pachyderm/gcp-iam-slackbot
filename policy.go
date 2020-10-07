@@ -27,7 +27,7 @@ type role string
 
 type resource string
 
-type member string
+type requestor string
 
 type ACL struct {
 	Groups    map[group]struct{}
