@@ -1,7 +1,7 @@
 steps:
 - name: gcr.io/cloud-builders/gcloud
   entrypoint: 'bash'
-  args: [ '-c', "gcloud secrets versions access 1 --secret=slackbot  --format='get(payload.data)' | tr '_-' '/+' | base64 -d >
+  args: [ '-c', "gcloud secrets versions access 1 --secret=slackbot --project=gcp-iam-slackbot --format='get(payload.data)' | tr '_-' '/+' | base64 -d >
 env.yaml" ]
 - name: gcr.io/cloud-builders/gcloud
   entrypoint: 'bash'
