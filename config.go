@@ -29,5 +29,16 @@ var EscalationPolicy = &Policy{
 				"projects/641324751618": struct{}{},
 			},
 		},
+		ACL{
+			Groups: map[group]struct{}{
+				"hub-on-call@pachyderm.io": struct{}{},
+			},
+			Roles: map[role]struct{}{
+				"roles/dns.admin": struct{}{},
+			},
+			Resources: map[resource]struct{}{
+				"projects/769359787859": struct{}{},
+			},
+		},
 	},
 }
