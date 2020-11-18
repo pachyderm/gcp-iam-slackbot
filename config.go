@@ -7,7 +7,7 @@ package gcpiamslack
 // No support for wildcards
 var EscalationPolicy = &Policy{
 	Policy: []ACL{
-		ACL{
+		{
 			Groups: map[group]struct{}{
 				"hub-on-call@pachyderm.io": struct{}{},
 			},
@@ -18,7 +18,7 @@ var EscalationPolicy = &Policy{
 				"organizations/6487630834": struct{}{},
 			},
 		},
-		ACL{
+		{
 			Groups: map[group]struct{}{
 				"hub-on-call@pachyderm.io": struct{}{},
 			},
@@ -29,7 +29,7 @@ var EscalationPolicy = &Policy{
 				"projects/pachhub-prod": struct{}{},
 			},
 		},
-		ACL{
+		{
 			Groups: map[group]struct{}{
 				"hub-on-call@pachyderm.io": struct{}{},
 			},
