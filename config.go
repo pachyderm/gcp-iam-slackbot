@@ -18,5 +18,27 @@ var EscalationPolicy = &Policy{
 				"organizations/6487630834": struct{}{},
 			},
 		},
+		{
+			Groups: map[group]struct{}{
+				"hub-on-call@pachyderm.io": struct{}{},
+			},
+			Roles: map[role]struct{}{
+				"organizations/6487630834/roles/hub_on_call_elevated": struct{}{},
+			},
+			Resources: map[resource]struct{}{
+				"projects/pachhub-prod": struct{}{},
+			},
+		},
+		{
+			Groups: map[group]struct{}{
+				"hub-on-call@pachyderm.io": struct{}{},
+			},
+			Roles: map[role]struct{}{
+				"roles/dns.admin": struct{}{},
+			},
+			Resources: map[resource]struct{}{
+				"projects/pachyderm-dns": struct{}{},
+			},
+		},
 	},
 }

@@ -60,12 +60,14 @@ func generateSlackEscalationRequestMessageFromModal(r *EscalationRequest) []slac
 	// Fields
 	nameField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*User:*\n%s", r.Requestor), false, false)
 	typeField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Role:*\n%s", r.Role), false, false)
+	resourceField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Resource:*\n%s", r.Resource), false, false)
 	whenField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*When:*\n%s", r.Timestamp), false, false)
 	reasonField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Reason:*\n%s", r.Reason), false, false)
 
 	fieldSlice := make([]*slack.TextBlockObject, 0)
 	fieldSlice = append(fieldSlice, nameField)
 	fieldSlice = append(fieldSlice, typeField)
+	fieldSlice = append(fieldSlice, resourceField)
 	fieldSlice = append(fieldSlice, whenField)
 	fieldSlice = append(fieldSlice, reasonField)
 
@@ -108,6 +110,7 @@ func generateSlackEscalationResponseMessage(r *EscalationRequest) []slack.Block 
 	//text = fmt.Sprintf("User: %s\n When: %s\n Reason: %s\n  Approver: %s\n The role %s has been granted for 1 hour.", user, when, reason, payload.User.Name, role)
 	nameField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*User:*\n%s", r.Requestor), false, false)
 	typeField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Role:*\n%s", r.Role), false, false)
+	resourceField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Resource:*\n%s", r.Resource), false, false)
 	whenField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*When:*\n%s", r.Timestamp), false, false)
 	reasonField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Reason:*\n%s", r.Reason), false, false)
 	approverField := slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s:*\n%s", r.Status.String(), r.Approver), false, false)
@@ -115,6 +118,7 @@ func generateSlackEscalationResponseMessage(r *EscalationRequest) []slack.Block 
 	fieldSlice := make([]*slack.TextBlockObject, 0)
 	fieldSlice = append(fieldSlice, nameField)
 	fieldSlice = append(fieldSlice, typeField)
+	fieldSlice = append(fieldSlice, resourceField)
 	fieldSlice = append(fieldSlice, whenField)
 	fieldSlice = append(fieldSlice, reasonField)
 	fieldSlice = append(fieldSlice, approverField)

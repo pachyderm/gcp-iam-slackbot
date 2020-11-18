@@ -2,7 +2,9 @@ package gcpiamslack
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"git.sr.ht/~urandom/dwd"
@@ -16,6 +18,13 @@ import (
 )
 
 // This file contains code related to GCP and Pagerduty integrations
+
+type ResourceType string
+
+const (
+	Projects      ResourceType = "projects"
+	Organizations ResourceType = "organizations"
+)
 
 type IntegrationClient struct{}
 
@@ -63,6 +72,11 @@ func (i *IntegrationClient) getGroupMembership(r *EscalationRequest) error {
 func (i *IntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r *EscalationRequest) error {
 	log.Debug("Getting IAM Policy")
 
+	rscType, err := parseResourceType(r.Resource)
+	if err != nil {
+		return err
+	}
+
 	cloudResourceManagerService, err := cloudresourcemanager.NewService(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize google cloudresourcemanager: %v", err)
@@ -97,7 +111,13 @@ func (i *IntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r *Esc
 	}
 	for {
 		d := b.Duration()
-		existingPolicy, err := cloudResourceManagerService.Organizations.GetIamPolicy(string(r.Resource), getIamPolicyRequest).Context(ctx).Do()
+		var existingPolicy *cloudresourcemanager.Policy
+		switch rscType {
+		case Projects:
+			existingPolicy, err = cloudResourceManagerService.Projects.GetIamPolicy(strings.Split(string(r.Resource), "/")[1], getIamPolicyRequest).Context(ctx).Do()
+		case Organizations:
+			existingPolicy, err = cloudResourceManagerService.Organizations.GetIamPolicy(string(r.Resource), getIamPolicyRequest).Context(ctx).Do()
+		}
 		if e, ok := err.(*googleapi.Error); ok {
 			if e.Code == 409 {
 				time.Sleep(d)
@@ -122,7 +142,12 @@ func (i *IntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r *Esc
 		setIamPolicyRequest := &cloudresourcemanager.SetIamPolicyRequest{
 			Policy: existingPolicy,
 		}
-		_, err = cloudResourceManagerService.Organizations.SetIamPolicy(string(r.Resource), setIamPolicyRequest).Context(ctx).Do()
+		switch rscType {
+		case Projects:
+			_, err = cloudResourceManagerService.Projects.SetIamPolicy(strings.Split(string(r.Resource), "/")[1], setIamPolicyRequest).Context(ctx).Do()
+		case Organizations:
+			_, err = cloudResourceManagerService.Organizations.SetIamPolicy(string(r.Resource), setIamPolicyRequest).Context(ctx).Do()
+		}
 		if e, ok := err.(*googleapi.Error); ok {
 			if e.Code == 409 {
 				time.Sleep(d)
@@ -134,6 +159,16 @@ func (i *IntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r *Esc
 		}
 		return nil
 	}
+}
+
+func parseResourceType(resource resource) (ResourceType, error) {
+	if strings.HasPrefix(string(resource), "projects/") {
+		return Projects, nil
+	}
+	if strings.HasPrefix(string(resource), "organizations/") {
+		return Organizations, nil
+	}
+	return "", errors.New("unexpected resource type, please check the configuration")
 }
 
 // if unable to reach pagerduty - just disables self approval
