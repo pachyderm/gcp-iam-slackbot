@@ -114,7 +114,7 @@ func (i *IntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r *Esc
 		var existingPolicy *cloudresourcemanager.Policy
 		switch rscType {
 		case Projects:
-			existingPolicy, err = cloudResourceManagerService.Projects.GetIamPolicy(string(r.Resource), getIamPolicyRequest).Context(ctx).Do()
+			existingPolicy, err = cloudResourceManagerService.Projects.GetIamPolicy(strings.Split(string(r.Resource), "/")[1], getIamPolicyRequest).Context(ctx).Do()
 		case Organizations:
 			existingPolicy, err = cloudResourceManagerService.Organizations.GetIamPolicy(string(r.Resource), getIamPolicyRequest).Context(ctx).Do()
 		}
@@ -144,7 +144,7 @@ func (i *IntegrationClient) conditionalBindIAMPolicy(ctx context.Context, r *Esc
 		}
 		switch rscType {
 		case Projects:
-			_, err = cloudResourceManagerService.Projects.SetIamPolicy(string(r.Resource), setIamPolicyRequest).Context(ctx).Do()
+			_, err = cloudResourceManagerService.Projects.SetIamPolicy(strings.Split(string(r.Resource), "/")[1], setIamPolicyRequest).Context(ctx).Do()
 		case Organizations:
 			_, err = cloudResourceManagerService.Organizations.SetIamPolicy(string(r.Resource), setIamPolicyRequest).Context(ctx).Do()
 		}

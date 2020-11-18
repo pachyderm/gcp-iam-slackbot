@@ -68,8 +68,8 @@ func (er *ER) handleApproval() ([]slack.Block, error) {
 		return nil, fmt.Errorf("unauthorized user, not from pachyderm.io: %v", er.Approver)
 	}
 
-	log.Infof("[AUDIT] Requestor: %s, Role: %s, When: %s, Reason: %s, %s: %s", er.Requestor,
-		er.Role, er.Timestamp, er.Reason, er.Status.String(), er.Approver)
+	log.Infof("[AUDIT] Requestor: %s, Role: %s, Resource: %s, When: %s, Reason: %s, %s: %s", er.Requestor,
+		er.Role, er.Resource, er.Timestamp, er.Reason, er.Status.String(), er.Approver)
 
 	if er.Status == Approved {
 		if !er.Oncall && string(er.Requestor) == er.Approver {

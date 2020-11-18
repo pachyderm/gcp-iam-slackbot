@@ -26,7 +26,7 @@ var EscalationPolicy = &Policy{
 				"organizations/6487630834/roles/hub_on_call_elevated": struct{}{},
 			},
 			Resources: map[resource]struct{}{
-				"projects/641324751618": struct{}{},
+				"projects/pachhub-prod": struct{}{},
 			},
 		},
 		ACL{
@@ -37,7 +37,7 @@ var EscalationPolicy = &Policy{
 				"roles/dns.admin": struct{}{},
 			},
 			Resources: map[resource]struct{}{
-				"projects/769359787859": struct{}{},
+				"projects/pachyderm-dns": struct{}{},
 			},
 		},
 	},
