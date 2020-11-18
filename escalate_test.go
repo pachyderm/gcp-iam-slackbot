@@ -15,7 +15,7 @@ func NewTestER(r *EscalationRequest) *ER {
 
 func TestHandleGCPEscalateIAMFromModal(t *testing.T) {
 	t.Run("HandleEscalate", func(t *testing.T) {
-		blockString := `[{"type":"section","text":{"type":"mrkdwn","text":"There is a new authentication request to escalate GCP privileges"}},{"type":"section","fields":[{"type":"mrkdwn","text":"*User:*\ntest@pachyderm.io"},{"type":"mrkdwn","text":"*Role:*\norganizations/6487630834/roles/hub_on_call_elevated"},{"type":"mrkdwn","text":"*When:*\n"},{"type":"mrkdwn","text":"*Reason:*\ntesting"}]},{"type":"actions","elements":[{"type":"button","text":{"type":"plain_text","text":"Approve"},"action_id":"id1234","value":"{\"requestor\":\"test@pachyderm.io\",\"groups\":{\"hub-on-call@pachyderm.io\":{},\"testing@pachyderm.io\":{}},\"role\":\"organizations/6487630834/roles/hub_on_call_elevated\",\"resource\":\"organizations/6487630834\",\"reason\":\"testing\",\"approver\":\"\",\"timestamp\":\"\",\"status\":true,\"oncall\":false}","style":"danger"},{"type":"button","text":{"type":"plain_text","text":"Deny"},"action_id":"id123","value":"{\"requestor\":\"test@pachyderm.io\",\"groups\":{\"hub-on-call@pachyderm.io\":{},\"testing@pachyderm.io\":{}},\"role\":\"organizations/6487630834/roles/hub_on_call_elevated\",\"resource\":\"organizations/6487630834\",\"reason\":\"testing\",\"approver\":\"\",\"timestamp\":\"\",\"status\":false,\"oncall\":false}"}]}]`
+		blockString := `[{"type":"section","text":{"type":"mrkdwn","text":"There is a new authentication request to escalate GCP privileges"}},{"type":"section","fields":[{"type":"mrkdwn","text":"*User:*\ntest@pachyderm.io"},{"type":"mrkdwn","text":"*Role:*\norganizations/6487630834/roles/hub_on_call_elevated"},{"type":"mrkdwn","text":"*Resource:*\norganizations/6487630834"},{"type":"mrkdwn","text":"*When:*\n"},{"type":"mrkdwn","text":"*Reason:*\ntesting"}]},{"type":"actions","elements":[{"type":"button","text":{"type":"plain_text","text":"Approve"},"action_id":"id1234","value":"{\"requestor\":\"test@pachyderm.io\",\"groups\":{\"hub-on-call@pachyderm.io\":{},\"testing@pachyderm.io\":{}},\"role\":\"organizations/6487630834/roles/hub_on_call_elevated\",\"resource\":\"organizations/6487630834\",\"reason\":\"testing\",\"approver\":\"\",\"timestamp\":\"\",\"status\":true,\"oncall\":false}","style":"danger"},{"type":"button","text":{"type":"plain_text","text":"Deny"},"action_id":"id123","value":"{\"requestor\":\"test@pachyderm.io\",\"groups\":{\"hub-on-call@pachyderm.io\":{},\"testing@pachyderm.io\":{}},\"role\":\"organizations/6487630834/roles/hub_on_call_elevated\",\"resource\":\"organizations/6487630834\",\"reason\":\"testing\",\"approver\":\"\",\"timestamp\":\"\",\"status\":false,\"oncall\":false}"}]}]`
 		er := NewTestER(&EscalationRequest{
 			Requestor: "test@pachyderm.io",
 			Groups:    make(map[group]struct{}),
@@ -72,6 +72,7 @@ func TestHandleApproval(t *testing.T) {
 							Verbatim: false,
 						},
 						&slack.TextBlockObject{Type: "mrkdwn", Text: "*Role:*\norganizations/6487630834/roles/hub_on_call_elevated"},
+						&slack.TextBlockObject{Type: "mrkdwn", Text: "*Resource:*\norganizations/6487630834"},
 						&slack.TextBlockObject{Type: "mrkdwn", Text: "*When:*\n"},
 						&slack.TextBlockObject{Type: "mrkdwn", Text: "*Reason:*\ntesting"},
 						&slack.TextBlockObject{Type: "mrkdwn", Text: "*Denier:*\ntest-approver@pachyderm.io"},
@@ -105,6 +106,7 @@ func TestHandleApproval(t *testing.T) {
 							Verbatim: false,
 						},
 						&slack.TextBlockObject{Type: "mrkdwn", Text: "*Role:*\norganizations/6487630834/roles/hub_on_call_elevated"},
+						&slack.TextBlockObject{Type: "mrkdwn", Text: "*Resource:*\norganizations/6487630834"},
 						&slack.TextBlockObject{Type: "mrkdwn", Text: "*When:*\n"},
 						&slack.TextBlockObject{Type: "mrkdwn", Text: "*Reason:*\ntesting"},
 						&slack.TextBlockObject{Type: "mrkdwn", Text: "*Approver:*\ntest-approver@pachyderm.io"},
