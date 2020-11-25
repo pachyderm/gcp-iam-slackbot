@@ -136,7 +136,8 @@ func createOptionBlockObjects(options map[string]struct{}) []*slack.OptionBlockO
 	optionBlockObjects := make([]*slack.OptionBlockObject, 0, len(options))
 	for o := range options {
 		optionText := slack.NewTextBlockObject(slack.PlainTextType, o, false, false)
-		optionBlockObjects = append(optionBlockObjects, slack.NewOptionBlockObject(o, optionText))
+		descriptionText := slack.NewTextBlockObject(slack.PlainTextType, o, false, false)
+		optionBlockObjects = append(optionBlockObjects, slack.NewOptionBlockObject(o, optionText, descriptionText))
 	}
 	return optionBlockObjects
 }
