@@ -40,5 +40,16 @@ var EscalationPolicy = &Policy{
 				"projects/pachyderm-dns": struct{}{},
 			},
 		},
+		{
+			Groups: map[group]struct{}{
+				"billing-reconciliation@pachyderm.io": struct{}{},
+			},
+			Roles: map[role]struct{}{
+				"organizations/6487630834/roles/BillingReconciliation": struct{}{},
+			},
+			Resources: map[resource]struct{}{
+				"organizations/6487630834": struct{}{},
+			},
+		},
 	},
 }
