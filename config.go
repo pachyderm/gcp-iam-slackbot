@@ -61,6 +61,16 @@ var EscalationPolicy = &Policy{
 			Resources: map[resource]struct{}{
 				"projects/pachhub-prod": struct{}{},
 			},
+		},{
+			Groups: map[group]struct{}{
+				"hub-on-call-sudo@pachyderm.io": struct{}{},
+			},
+			Roles: map[role]struct{}{
+				"roles/security.admin": struct{}{},
+			},
+			Resources: map[resource]struct{}{
+				"projects/pachhub-prod": struct{}{},
+			},
 		},
 	},
 }
