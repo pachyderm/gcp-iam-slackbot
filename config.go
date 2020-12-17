@@ -66,7 +66,7 @@ var EscalationPolicy = &Policy{
 				"hub-on-call-sudo@pachyderm.io": struct{}{},
 			},
 			Roles: map[role]struct{}{
-				"roles/security.admin": struct{}{},
+				"roles/iam.securityAdmin": struct{}{},
 			},
 			Resources: map[resource]struct{}{
 				"organizations/6487630834": struct{}{},
