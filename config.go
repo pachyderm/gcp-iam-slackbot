@@ -69,7 +69,7 @@ var EscalationPolicy = &Policy{
 				"roles/security.admin": struct{}{},
 			},
 			Resources: map[resource]struct{}{
-				"projects/pachhub-prod": struct{}{},
+				"organizations/6487630834": struct{}{},
 			},
 		},
 	},
