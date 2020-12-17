@@ -51,5 +51,16 @@ var EscalationPolicy = &Policy{
 				"organizations/6487630834": struct{}{},
 			},
 		},
+		{
+			Groups: map[group]struct{}{
+				"prod-db-access@pachyderm.io": struct{}{},
+			},
+			Roles: map[role]struct{}{
+				"roles/cloudsql.admin": struct{}{},
+			},
+			Resources: map[resource]struct{}{
+				"projects/pachhub-prod": struct{}{},
+			},
+		},
 	},
 }
