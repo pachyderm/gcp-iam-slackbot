@@ -83,67 +83,11 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
 	switch message.Type {
 	case "view_submission":
-		//send an empty acceptance response
-		w.WriteHeader(http.StatusOK)
-		_, err = w.Write([]byte{})
-		if err != nil {
-			log.Errorf("sending ok response to slack: %v", err)
-			return
-		}
-		escalationRequest, err := parseEscalationRequestFromModal(message)
-		if err != nil {
-			log.Errorf("invalid modal: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		er := NewER(escalationRequest)
-		blocks, err := er.handleGCPEscalateIAMRequestFromModal()
-		if err != nil {
-			log.Errorf("couldn't handle escalation request: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		msg := slack.MsgOptionBlocks(blocks...)
-		//https://pachyderm.slack.com/archives/C01BPEQ024E
-		_, _, err = api.PostMessage("C01BPEQ024E", msg)
-		if err != nil {
-			log.Errorf("can't complete modal action: %v", err)
-			return
-		}
+		viewSubmission(w, r, message)
 	case "block_actions":
-		escalationRequest, err := parseEscalationRequestFromApproval(message)
-		if err != nil {
-			log.Errorf("invalid escaltion request: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		er := NewER(escalationRequest)
-		blocks, err := er.handleApproval()
-		if err != nil {
-			log.Errorf("can't complete approval action: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		msg := slack.NewBlockMessage(blocks...)
-		msg.ResponseType = "in_channel"
-		msg.ReplaceOriginal = true
-		b, err := json.MarshalIndent(msg, "", "    ")
-		if err != nil {
-			log.Errorf("marshalling json: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-
-		}
-		resp, err := http.Post(message.ResponseURL, "application/json", bytes.NewReader(b))
-		if err != nil {
-			log.Errorf("sending http request: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-
-		}
-		defer resp.Body.Close()
+		blockActions(w, r, message)
 	default:
 		log.Errorf("unsupported action")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -178,4 +122,76 @@ func verifyAuth(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("failed to verify SigningSecret: %v", err)
 	}
 	return nil
+}
+
+func viewSubmission(w http.ResponseWriter, r *http.Request, message slack.InteractionCallback) {
+	//send an empty acceptance response
+	w.WriteHeader(http.StatusOK)
+	escalationRequest, err := parseEscalationRequestFromModal(message)
+	if err != nil {
+		errMessage := fmt.Sprintf("counldn't parse escalation request: %v", err)
+		log.Error(errMessage)
+		blocks := textToBlock(errMessage)
+		msg := slack.MsgOptionBlocks(blocks...)
+		_, _, err = api.PostMessage("C01BPEQ024E", msg)
+		if err != nil {
+			log.Errorf("can't complete modal action: %v", err)
+		}
+		//w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	er := NewER(escalationRequest)
+	blocks, err := er.handleGCPEscalateIAMRequestFromModal()
+	if err != nil {
+		errMessage := fmt.Sprintf("counldn't handle escalation request: %v", err)
+		log.Error(errMessage)
+		blocks := textToBlock(errMessage)
+		msg := slack.MsgOptionBlocks(blocks...)
+		_, _, err = api.PostMessage("C01BPEQ024E", msg)
+		if err != nil {
+			log.Errorf("can't complete modal action: %v", err)
+		}
+		//w.WriteHeader(http.StatusInternalServerError)
+	}
+	msg := slack.MsgOptionBlocks(blocks...)
+	//https://pachyderm.slack.com/archives/C01BPEQ024E
+	_, _, err = api.PostMessage("C01BPEQ024E", msg)
+	if err != nil {
+		log.Errorf("can't complete modal action: %v", err)
+	}
+}
+
+func blockActions(w http.ResponseWriter, r *http.Request, message slack.InteractionCallback) {
+	escalationRequest, err := parseEscalationRequestFromApproval(message)
+	if err != nil {
+		errMessage := fmt.Sprintf("couldn't parse approval: %v", err)
+		log.Error(errMessage)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	er := NewER(escalationRequest)
+	blocks, err := er.handleApproval()
+	if err != nil {
+		errMessage := fmt.Sprintf("couldn't handle approval: %v", err)
+		log.Error(errMessage)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	msg := slack.NewBlockMessage(blocks...)
+	msg.ResponseType = "in_channel"
+	msg.ReplaceOriginal = true
+	b, err := json.MarshalIndent(msg, "", "    ")
+	if err != nil {
+		log.Errorf("marshalling json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	resp, err := http.Post(message.ResponseURL, "application/json", bytes.NewReader(b))
+	if err != nil {
+		log.Errorf("sending http request: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
 }
