@@ -132,6 +132,17 @@ func generateSlackEscalationResponseMessage(r *EscalationRequest) []slack.Block 
 
 }
 
+func textToBlock(text string) []slack.Block {
+	var headerSection *slack.SectionBlock
+
+	headerText := slack.NewTextBlockObject("mrkdwn", text, false, false)
+	headerSection = slack.NewSectionBlock(headerText, nil, nil)
+	blocks := []slack.Block{
+		headerSection,
+	}
+	return blocks
+}
+
 func createOptionBlockObjects(options map[string]struct{}) []*slack.OptionBlockObject {
 	optionBlockObjects := make([]*slack.OptionBlockObject, 0, len(options))
 	for o := range options {

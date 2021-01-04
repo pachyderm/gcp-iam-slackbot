@@ -54,7 +54,7 @@ func (er *ER) handleGCPEscalateIAMRequestFromModal() ([]slack.Block, error) {
 	er.Oncall = er.Client.lookupCurrentOnCall(er.EscalationRequest)
 
 	if !EscalationPolicy.Authorize(er.EscalationRequest) {
-		return nil, fmt.Errorf("unauthorized: %v", er.Requestor)
+		return nil, fmt.Errorf("unauthorized: %v. Please double check it's a valid role and resource combination", er.Requestor)
 	}
 
 	msg := generateSlackEscalationRequestMessageFromModal(er.EscalationRequest)
