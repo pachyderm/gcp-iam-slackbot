@@ -14,7 +14,11 @@ import (
 	"github.com/slack-go/slack"
 )
 
-const HubEscalationPolicyID = "PJVVTQR"
+const (
+	HubEscalationPolicyID = "PJVVTQR"
+	//https://pachyderm.slack.com/archives/C01BPEQ024E
+	SlackChannel = "C01BPEQ024E"
+)
 
 var signingSecret string
 var client *pagerduty.Client
@@ -89,7 +93,7 @@ func ActionHandler(w http.ResponseWriter, r *http.Request) {
 	case "block_actions":
 		blockActions(w, r, message)
 	default:
-		log.Errorf("unsupported action")
+		log.Errorf("unsupported action: %v", message.Type)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -129,33 +133,18 @@ func viewSubmission(w http.ResponseWriter, r *http.Request, message slack.Intera
 	w.WriteHeader(http.StatusOK)
 	escalationRequest, err := parseEscalationRequestFromModal(message)
 	if err != nil {
-		errMessage := fmt.Sprintf("counldn't parse escalation request: %v", err)
-		log.Error(errMessage)
-		blocks := textToBlock(errMessage)
-		msg := slack.MsgOptionBlocks(blocks...)
-		_, _, err = api.PostMessage("C01BPEQ024E", msg)
-		if err != nil {
-			log.Errorf("can't complete modal action: %v", err)
-		}
-		//w.WriteHeader(http.StatusInternalServerError)
+		modalError(err)
+		return
 	}
 
 	er := NewER(escalationRequest)
 	blocks, err := er.handleGCPEscalateIAMRequestFromModal()
 	if err != nil {
-		errMessage := fmt.Sprintf("counldn't handle escalation request: %v", err)
-		log.Error(errMessage)
-		blocks := textToBlock(errMessage)
-		msg := slack.MsgOptionBlocks(blocks...)
-		_, _, err = api.PostMessage("C01BPEQ024E", msg)
-		if err != nil {
-			log.Errorf("can't complete modal action: %v", err)
-		}
-		//w.WriteHeader(http.StatusInternalServerError)
+		modalError(err)
+		return
 	}
 	msg := slack.MsgOptionBlocks(blocks...)
-	//https://pachyderm.slack.com/archives/C01BPEQ024E
-	_, _, err = api.PostMessage("C01BPEQ024E", msg)
+	_, _, err = api.PostMessage(SlackChannel, msg)
 	if err != nil {
 		log.Errorf("can't complete modal action: %v", err)
 	}
@@ -164,8 +153,7 @@ func viewSubmission(w http.ResponseWriter, r *http.Request, message slack.Intera
 func blockActions(w http.ResponseWriter, r *http.Request, message slack.InteractionCallback) {
 	escalationRequest, err := parseEscalationRequestFromApproval(message)
 	if err != nil {
-		errMessage := fmt.Sprintf("couldn't parse approval: %v", err)
-		log.Error(errMessage)
+		log.Errorf("couldn't parse approval: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -173,8 +161,7 @@ func blockActions(w http.ResponseWriter, r *http.Request, message slack.Interact
 	er := NewER(escalationRequest)
 	blocks, err := er.handleApproval()
 	if err != nil {
-		errMessage := fmt.Sprintf("couldn't handle approval: %v", err)
-		log.Error(errMessage)
+		log.Errorf("couldn't handle approval: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -187,11 +174,28 @@ func blockActions(w http.ResponseWriter, r *http.Request, message slack.Interact
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	resp, err := http.Post(message.ResponseURL, "application/json", bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(r.Context(), "POST", message.ResponseURL, bytes.NewReader(b))
+	if err != nil {
+		log.Errorf("generating http request: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Errorf("sending http request: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
+}
+
+func modalError(err error) {
+	errMessage := fmt.Sprintf("counldn't handle escalation request: %v", err)
+	log.Error(errMessage)
+	blocks := textToBlock(errMessage)
+	msg := slack.MsgOptionBlocks(blocks...)
+	if _, _, err := api.PostMessage(SlackChannel, msg); err != nil {
+		log.Errorf("can't complete modal action: %v", err)
+	}
 }
