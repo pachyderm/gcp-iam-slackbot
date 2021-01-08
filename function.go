@@ -31,6 +31,10 @@ func init() {
 	client = pagerduty.NewClient(os.Getenv("PD_AUTH_TOKEN"))
 }
 
+func HealthzHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
 func SlashHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("SlashHandler")
 	if err := verifyAuth(w, r); err != nil {
