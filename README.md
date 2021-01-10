@@ -4,9 +4,11 @@ A slackbot controlling GCP Privlidge Escalation deployed using cloud functions.
 ## Deployment
 From the root of this repository, run the following two commands.
 
-`gcloud functions deploy SlashHandler --runtime go113 --trigger-http --allow-unauthenticated --project=gcp-iam-slackbot --set-env-vars SLACK_SECRET=XXXXXXXXX,SLACK_API_TOKEN=XXXXXXXXX,PD_AUTH_TOKEN=XXXXXXXXX --service-account cloud-function-iam-slackbot@gcp-iam-slackbot.iam.gserviceaccount.com`
+```
+gcloud functions deploy SlashHandler --runtime go113 --trigger-http --allow-unauthenticated --project=gcp-iam-slackbot --set-env-vars SLACK_SECRET=XXXXXXXXX,SLACK_API_TOKEN=XXXXXXXXX,PD_AUTH_TOKEN=XXXXXXXXX --service-account cloud-function-iam-slackbot@gcp-iam-slackbot.iam.gserviceaccount.com
 
-`gcloud functions deploy ActionHandler --runtime go113 --trigger-http --allow-unauthenticated --project=gcp-iam-slackbot --set-env-vars SLACK_SECRET=XXXXXXXXX,SLACK_API_TOKEN=XXXXXXXXX,PD_AUTH_TOKEN=XXXXXXXXX --service-account cloud-function-iam-slackbot@gcp-iam-slackbot.iam.gserviceaccount.com`
+gcloud functions deploy ActionHandler --runtime go113 --trigger-http --allow-unauthenticated --project=gcp-iam-slackbot --set-env-vars SLACK_SECRET=XXXXXXXXX,SLACK_API_TOKEN=XXXXXXXXX,PD_AUTH_TOKEN=XXXXXXXXX --service-account cloud-function-iam-slackbot@gcp-iam-slackbot.iam.gserviceaccount.com
+```
 
 This deploys the cloud functions to gcp-iam-slackbot GCP project.
 
