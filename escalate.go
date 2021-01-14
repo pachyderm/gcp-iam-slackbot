@@ -72,9 +72,6 @@ func (er *ER) handleApproval() ([]slack.Block, error) {
 		er.Role, er.Resource, er.Timestamp, er.Reason, er.Status.String(), er.Approver)
 
 	if er.Status == Approved {
-		// if !er.Oncall && string(er.Requestor) == er.Approver {
-		//     	return nil, fmt.Errorf("unauthorized, approver cannot be requester: %v", er.Approver)
-		// }
 		err := er.Client.conditionalBindIAMPolicy(ctx, er.EscalationRequest)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't set IAM policy: %v", err)
