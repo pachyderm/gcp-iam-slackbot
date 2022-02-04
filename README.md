@@ -1,5 +1,5 @@
 # gcp-iam-slackbot
-A slackbot controlling GCP Privlidge Escalation deployed using cloud functions.
+A slackbot controlling GCP Privilege Escalation deployed using cloud functions.
 
 ## Deployment
 From the root of this repository, run the following two commands.
